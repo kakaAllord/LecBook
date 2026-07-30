@@ -9,7 +9,9 @@
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
     "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:clear": "tsx prisma/clear.ts",
+    "docs:guide": "tsx scripts/generate-getting-started-pdf.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -17,8 +17,13 @@ A single Next.js application (frontend + backend in one project, one deploy) tha
 
 ```
 prisma/
-  schema.prisma        Data model (User, Course, Student, Attendance, AssessmentType, Assessment, AssessmentMark)
+  schema.prisma        Data model (User, Settings, Course, Student, Attendance, AssessmentType, Assessment, AssessmentMark)
   seed.ts               Seed script (lecturer login + sample courses/students/assessments/attendance)
+  clear.ts               Wipes everything except the User table (used by `npm run db:clear`)
+scripts/
+  generate-getting-started-pdf.ts   Generates public/getting-started-guide.pdf (used by `npm run docs:guide`)
+public/
+  getting-started-guide.pdf         Generated user guide, served statically and linked from Settings
 src/
   app/
     api/                 Route Handlers = REST API (courses, students, attendance, assessments, reports, auth, dashboard)
@@ -54,7 +59,6 @@ cp .env.example .env
 ```
 DATABASE_URL="file:./dev.db"          # SQLite for local dev; use a postgres:// URL in production
 JWT_SECRET="change-me-to-a-long-random-string"
-INSTITUTION_NAME="Your Institution Name"   # Printed at the top of generated PDF reports
 ```
 
 ### 3. Set up the database
@@ -68,6 +72,8 @@ The seed script creates a lecturer login:
 
 - **Email:** `lecturer@example.com`
 - **Password:** `REDACTED_SEED_PASSWORD`
+
+There is no in-app way to change these credentials by design — update them directly in `prisma/seed.ts` (or in the database) if needed.
 
 ### 4. Run the app
 
@@ -93,8 +99,10 @@ npm run start
 | `npm run start` | Run the production build |
 | `npm run lint` | Run ESLint |
 | `npm run db:migrate` | Run Prisma migrations |
-| `npm run db:seed` | Seed the database |
+| `npm run db:seed` | Seed the database with sample courses/students/assessments/attendance |
 | `npm run db:studio` | Open Prisma Studio to inspect the database |
+| `npm run db:clear` | **Destructive.** Wipes courses, students, attendance, assessments, marks and settings — leaves only the `User` table (login credentials) intact. Use this to reset a demo/training environment back to a blank slate without losing the login. |
+| `npm run docs:guide` | Regenerates `public/getting-started-guide.pdf` (optionally pass an institution name, e.g. `npm run docs:guide -- "My College"`) |
 
 ## Features
 
@@ -105,17 +113,9 @@ npm run start
 - **Assessment Types** — fully dynamic, nothing hardcoded (Quiz, Test, Assignment, Practical, etc. are just data); create/edit/delete your own.
 - **Assessments & Marks** — create an assessment against a course + type, enter marks per student with automatic max-marks validation, edit later.
 - **Reports** — generate a printable PDF for attendance (by course + date range, with per-student attendance %) or for a single assessment (marks, average, highest, lowest), with the institution name in the header.
+- **Settings** — set the Institution Name shown in the sidebar and printed at the top of every PDF report; stored in the database (not an env var), so it's editable from the UI. Also the place to (re)download the Getting Started guide.
 - **Dark mode** — toggle in the sidebar, persisted to `localStorage`.
-
-## Docker (optional)
-
-```bash
-docker compose up --build
-```
-
-This builds the app image and runs it with a SQLite database persisted in a named volume (`db-data:/app/data`). On container start it runs `prisma migrate deploy` before starting the server. Edit `docker-compose.yml` to set a real `JWT_SECRET` and `INSTITUTION_NAME` for anything beyond local testing.
-
-To use PostgreSQL instead of SQLite (recommended for a real deployment), change `provider = "sqlite"` to `provider = "postgresql"` in `prisma/schema.prisma`, regenerate the migration (`npm run db:migrate`), and point `DATABASE_URL` at your Postgres instance.
+- **Getting Started guide** — a generated PDF (`public/getting-started-guide.pdf`, downloadable from the Settings page) walking through every feature from login to reports.
 
 ## Notes
 

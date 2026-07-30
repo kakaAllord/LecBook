@@ -17,10 +17,13 @@ export function bufferPdf(build: (doc: PDFKit.PDFDocument) => void): Promise<Buf
   });
 }
 
-export function addReportHeader(doc: PDFKit.PDFDocument, title: string, subtitle?: string) {
-  const institution = process.env.INSTITUTION_NAME || "Institution";
-
-  doc.fontSize(16).font("Helvetica-Bold").text(institution, { align: "center" });
+export function addReportHeader(
+  doc: PDFKit.PDFDocument,
+  institutionName: string,
+  title: string,
+  subtitle?: string
+) {
+  doc.fontSize(16).font("Helvetica-Bold").text(institutionName, { align: "center" });
   doc.moveDown(0.2);
   doc.fontSize(13).font("Helvetica-Bold").text(title, { align: "center" });
   if (subtitle) {

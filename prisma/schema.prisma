@@ -15,6 +15,12 @@ model User {
   createdAt DateTime @default(now())
 }
 
+model Settings {
+  id              String   @id @default(cuid())
+  institutionName String   @default("Your Institution Name")
+  updatedAt       DateTime @updatedAt
+}
+
 model Course {
   id           String   @id @default(cuid())
   name         String

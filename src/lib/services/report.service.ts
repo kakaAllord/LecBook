@@ -2,9 +2,13 @@ import dayjs from "dayjs";
 import { prisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api-response";
 import { bufferPdf, addReportHeader, drawTableRow } from "@/lib/pdf";
+import { getSettings } from "@/lib/services/settings.service";
 
 export async function generateAttendanceReport(courseId: string, from?: string, to?: string) {
-  const course = await prisma.course.findUnique({ where: { id: courseId } });
+  const [course, settings] = await Promise.all([
+    prisma.course.findUnique({ where: { id: courseId } }),
+    getSettings(),
+  ]);
   if (!course) throw new ApiError("Course not found", 404);
 
   const dateFilter: { gte?: Date; lte?: Date } = {};
@@ -29,7 +33,7 @@ export async function generateAttendanceReport(courseId: string, from?: string, 
   const colWidths = { reg: 75, name: 145, present: 45, absent: 45, late: 40, excused: 50, total: 40, pct: 55 };
 
   const pdf = await bufferPdf((doc) => {
-    addReportHeader(doc, "Attendance Report", subtitle);
+    addReportHeader(doc, settings.institutionName, "Attendance Report", subtitle);
 
     drawTableRow(
       doc,
@@ -91,10 +95,13 @@ export async function generateAttendanceReport(courseId: string, from?: string, 
 }
 
 export async function generateAssessmentReport(assessmentId: string) {
-  const assessment = await prisma.assessment.findUnique({
-    where: { id: assessmentId },
-    include: { course: true, assessmentType: true },
-  });
+  const [assessment, settings] = await Promise.all([
+    prisma.assessment.findUnique({
+      where: { id: assessmentId },
+      include: { course: true, assessmentType: true },
+    }),
+    getSettings(),
+  ]);
   if (!assessment) throw new ApiError("Assessment not found", 404);
 
   const marks = await prisma.assessmentMark.findMany({
@@ -114,7 +121,7 @@ export async function generateAssessmentReport(assessmentId: string) {
   const colWidths = { reg: 90, name: 210, marks: 90, remarks: 125 };
 
   const pdf = await bufferPdf((doc) => {
-    addReportHeader(doc, "Assessment Report", subtitle);
+    addReportHeader(doc, settings.institutionName, "Assessment Report", subtitle);
 
     doc.font("Helvetica-Bold").fontSize(10);
     doc.text(

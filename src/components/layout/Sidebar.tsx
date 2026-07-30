@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   BookOpen,
@@ -10,6 +11,7 @@ import {
   ClipboardCheck,
   ListChecks,
   FileBarChart,
+  Settings as SettingsIcon,
   LogOut,
   GraduationCap,
   Menu,
@@ -27,6 +29,7 @@ const NAV_ITEMS = [
   { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
   { href: "/assessments", label: "Assessments", icon: ListChecks },
   { href: "/reports", label: "Reports", icon: FileBarChart },
+  { href: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 export function Sidebar({ userName }: { userName: string }) {
@@ -34,6 +37,12 @@ export function Sidebar({ userName }: { userName: string }) {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  const { data: settings } = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => api.get<{ institutionName: string }>("/api/settings"),
+    staleTime: 5 * 60_000,
+  });
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -96,9 +105,14 @@ export function Sidebar({ userName }: { userName: string }) {
           mobileOpen ? "flex" : "hidden"
         )}
       >
-        <div className="hidden items-center gap-2 border-b border-slate-200 px-5 py-4 font-semibold text-slate-900 lg:flex dark:border-slate-800 dark:text-slate-100">
-          <GraduationCap className="h-5 w-5 text-indigo-600" />
-          LRMS
+        <div className="hidden flex-col gap-1 border-b border-slate-200 px-5 py-4 lg:flex dark:border-slate-800">
+          <div className="flex items-center gap-2 font-semibold text-slate-900 dark:text-slate-100">
+            <GraduationCap className="h-5 w-5 text-indigo-600" />
+            LRMS
+          </div>
+          {settings?.institutionName && (
+            <p className="truncate text-xs text-slate-400">{settings.institutionName}</p>
+          )}
         </div>
         {nav}
         <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 dark:border-slate-800">
