@@ -107,6 +107,16 @@ npm run start
 - **Reports** — generate a printable PDF for attendance (by course + date range, with per-student attendance %) or for a single assessment (marks, average, highest, lowest), with the institution name in the header.
 - **Dark mode** — toggle in the sidebar, persisted to `localStorage`.
 
+## Docker (optional)
+
+```bash
+docker compose up --build
+```
+
+This builds the app image and runs it with a SQLite database persisted in a named volume (`db-data:/app/data`). On container start it runs `prisma migrate deploy` before starting the server. Edit `docker-compose.yml` to set a real `JWT_SECRET` and `INSTITUTION_NAME` for anything beyond local testing.
+
+To use PostgreSQL instead of SQLite (recommended for a real deployment), change `provider = "sqlite"` to `provider = "postgresql"` in `prisma/schema.prisma`, regenerate the migration (`npm run db:migrate`), and point `DATABASE_URL` at your Postgres instance.
+
 ## Notes
 
 - All API responses use a consistent envelope: `{ success: true, data }` or `{ success: false, message }`.

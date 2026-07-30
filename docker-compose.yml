@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: file:/app/data/dev.db
+      JWT_SECRET: change-me-to-a-long-random-string
+      INSTITUTION_NAME: Your Institution Name
+    volumes:
+      - db-data:/app/data
+    ports:
+      - "3000:3000"
+
+volumes:
+  db-data:

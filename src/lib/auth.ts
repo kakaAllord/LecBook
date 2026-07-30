@@ -5,9 +5,12 @@ import { AUTH_COOKIE, AUTH_COOKIE_MAX_AGE } from "@/lib/auth-cookie";
 
 export { AUTH_COOKIE, AUTH_COOKIE_MAX_AGE } from "@/lib/auth-cookie";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error("JWT_SECRET environment variable is not set");
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_SECRET environment variable is not set");
+  }
+  return secret;
 }
 
 export type SessionPayload = {
@@ -17,11 +20,11 @@ export type SessionPayload = {
 };
 
 export function signToken(payload: SessionPayload) {
-  return jwt.sign(payload, JWT_SECRET!, { expiresIn: AUTH_COOKIE_MAX_AGE });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: AUTH_COOKIE_MAX_AGE });
 }
 
 export function verifyToken(token: string): SessionPayload {
-  return jwt.verify(token, JWT_SECRET!) as SessionPayload;
+  return jwt.verify(token, getJwtSecret()) as SessionPayload;
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
