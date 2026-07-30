@@ -66,8 +66,8 @@ npm run db:seed      # optional: seeds a lecturer account + sample data
 
 The seed script creates a lecturer login:
 
-- **Email:** `yosiamasterpiece@gmail.com`
-- **Password:** `Passw0rd!`
+- **Email:** `lecturer@example.com`
+- **Password:** `REDACTED_SEED_PASSWORD`
 
 ### 4. Run the app
 

@@ -27,17 +27,17 @@ function randomInt(min: number, max: number): number {
 async function main() {
   console.log("Seeding database...");
 
-  const passwordHash = await bcrypt.hash("Passw0rd!", 10);
+  const passwordHash = await bcrypt.hash("REDACTED_SEED_PASSWORD", 10);
   const lecturer = await prisma.user.upsert({
-    where: { email: "yosiamasterpiece@gmail.com" },
-    update: {},
+    where: { email: "lecturer@example.com" },
+    update: { password: passwordHash },
     create: {
-      name: "Yosia",
-      email: "yosiamasterpiece@gmail.com",
+      name: "Wickleaf",
+      email: "lecturer@example.com",
       password: passwordHash,
     },
   });
-  console.log(`Lecturer user ready: ${lecturer.email} (password: Passw0rd!)`);
+  console.log(`Lecturer user ready: ${lecturer.email}`);
 
   const courseData = [
     { name: "Electrical Engineering", level: "Level 5", semester: "Semester II", academicYear: "2026" },
