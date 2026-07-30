@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const assessmentTypeSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
-  maxMarks: z.coerce.number().positive("Max marks must be greater than 0"),
+  maxMarks: z.number().positive("Max marks must be greater than 0"),
   description: z.string().max(500).optional().or(z.literal("")),
 });
 export const assessmentTypeUpdateSchema = assessmentTypeSchema.partial();

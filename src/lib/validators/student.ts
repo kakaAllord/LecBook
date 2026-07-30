@@ -6,7 +6,7 @@ export const studentSchema = z.object({
   gender: z.string().min(1, "Gender is required").max(30),
   phone: z.string().max(30).optional().or(z.literal("")),
   courseId: z.string().min(1, "Course is required"),
-  status: z.enum(["ACTIVE", "INACTIVE"]).default("ACTIVE"),
+  status: z.enum(["ACTIVE", "INACTIVE"]),
 });
 
 export const studentUpdateSchema = studentSchema.partial();
