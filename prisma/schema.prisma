@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+}
+
+model Course {
+  id           String   @id @default(cuid())
+  name         String
+  level        String
+  semester     String
+  academicYear String
+  createdAt    DateTime @default(now())
+
+  students    Student[]
+  assessments Assessment[]
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Student {
+  id                 String        @id @default(cuid())
+  registrationNumber String        @unique
+  fullName           String
+  gender             String
+  phone              String?
+  courseId           String
+  status             StudentStatus @default(ACTIVE)
+  createdAt          DateTime      @default(now())
+
+  course    Course           @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  attendance Attendance[]
+  marks     AssessmentMark[]
+
+  @@index([courseId])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+model Attendance {
+  id        String           @id @default(cuid())
+  studentId String
+  date      DateTime
+  status    AttendanceStatus
+  remarks   String?
+  createdAt DateTime         @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, date])
+  @@index([date])
+}
+
+model AssessmentType {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  maxMarks    Float
+  description String?
+  createdAt   DateTime @default(now())
+
+  assessments Assessment[]
+}
+
+model Assessment {
+  id               String   @id @default(cuid())
+  courseId         String
+  assessmentTypeId String
+  title            String
+  date             DateTime
+  createdAt        DateTime @default(now())
+
+  course         Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  assessmentType AssessmentType   @relation(fields: [assessmentTypeId], references: [id], onDelete: Restrict)
+  marks          AssessmentMark[]
+
+  @@index([courseId])
+}
+
+model AssessmentMark {
+  id           String  @id @default(cuid())
+  assessmentId String
+  studentId    String
+  marks        Float
+  remarks      String?
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, studentId])
+}
