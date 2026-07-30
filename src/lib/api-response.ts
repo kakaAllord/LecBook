@@ -41,6 +41,14 @@ export function handleApiError(error: unknown) {
   ) {
     return fail("Record not found.", 404);
   }
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "P2003"
+  ) {
+    return fail("Cannot delete this record because other records depend on it.", 409);
+  }
   console.error(error);
   return fail("Something went wrong. Please try again.", 500);
 }
