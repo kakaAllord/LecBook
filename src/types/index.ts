@@ -109,5 +109,7 @@ export type Settings = {
   id: string;
   institutionName: string;
   institutionLogo: string | null;
+  attendanceThreshold: number;
+  assessmentPassMark: number;
   updatedAt: string;
 };

@@ -53,7 +53,11 @@ export default function SettingsPage() {
 
   if (data && data !== syncedSettings) {
     setSyncedSettings(data);
-    reset({ institutionName: data.institutionName });
+    reset({
+      institutionName: data.institutionName,
+      attendanceThreshold: data.attendanceThreshold,
+      assessmentPassMark: data.assessmentPassMark,
+    });
     setLogo(data.institutionLogo);
   }
 
@@ -170,6 +174,41 @@ export default function SettingsPage() {
                 <p className="mt-1 text-xs text-slate-400">
                   Shown in the sidebar and printed at the top of every generated PDF report.
                 </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 border-t border-slate-200 pt-4 sm:grid-cols-2 dark:border-slate-800">
+                <div>
+                  <Label htmlFor="attendanceThreshold">Minimum Attendance Threshold (%)</Label>
+                  <Input
+                    id="attendanceThreshold"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    error={errors.attendanceThreshold?.message}
+                    {...register("attendanceThreshold", { valueAsNumber: true })}
+                  />
+                  <FieldError message={errors.attendanceThreshold?.message} />
+                  <p className="mt-1 text-xs text-slate-400">
+                    Attendance reports flag students below this as &quot;LOW&quot;.
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="assessmentPassMark">Assessment Pass Mark (%)</Label>
+                  <Input
+                    id="assessmentPassMark"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    error={errors.assessmentPassMark?.message}
+                    {...register("assessmentPassMark", { valueAsNumber: true })}
+                  />
+                  <FieldError message={errors.assessmentPassMark?.message} />
+                  <p className="mt-1 text-xs text-slate-400">
+                    The &quot;All Assessments&quot; report marks students at/above this PASS, below REDO.
+                  </p>
+                </div>
               </div>
 
               <div className="flex justify-end">

@@ -74,6 +74,24 @@ export function drawTick(doc: PDFKit.PDFDocument, x: number, y: number, size = 8
   doc.restore();
 }
 
+export function drawStatusCell(
+  doc: PDFKit.PDFDocument,
+  x: number,
+  y: number,
+  width: number,
+  rowHeight: number,
+  label: string,
+  positive: boolean
+) {
+  const bg = positive ? "#dcfce7" : "#fee2e2";
+  const fg = positive ? "#166534" : "#991b1b";
+  doc.save();
+  doc.rect(x + 3, y - 3, width - 6, rowHeight - 4).fill(bg);
+  doc.restore();
+  doc.fillColor(fg).font("Helvetica-Bold").fontSize(7.5).text(label, x, y, { width, align: "center" });
+  doc.fillColor("#000000").font("Helvetica").fontSize(8);
+}
+
 export function drawTableRow(
   doc: PDFKit.PDFDocument,
   columns: { text: string; width: number; align?: "left" | "right" | "center"; ellipsis?: boolean }[],

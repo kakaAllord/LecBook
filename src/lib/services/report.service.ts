@@ -1,7 +1,7 @@
 import dayjs from "dayjs";
 import { prisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api-response";
-import { bufferPdf, addReportHeader, drawTableRow, drawTick } from "@/lib/pdf";
+import { bufferPdf, addReportHeader, drawTableRow, drawTick, drawStatusCell } from "@/lib/pdf";
 import { getSettings } from "@/lib/services/settings.service";
 
 const REG_COL_WIDTH = 65;
@@ -12,6 +12,7 @@ const DATE_COL_WIDTH = 24;
 const ROW_HEIGHT = 16;
 const ASSESSMENT_COL_WIDTH = 55;
 const SIGNATURE_COL_WIDTH = 90;
+const STATUS_COL_WIDTH = 48;
 
 export async function generateAttendanceReport(courseId: string, from?: string, to?: string) {
   const [course, settings] = await Promise.all([
@@ -70,7 +71,7 @@ export async function generateAttendanceReport(courseId: string, from?: string, 
       }
 
       const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-      const fixedWidth = REG_COL_WIDTH + NAME_COL_WIDTH + PRESENT_COL_WIDTH + PCT_COL_WIDTH;
+      const fixedWidth = REG_COL_WIDTH + NAME_COL_WIDTH + PRESENT_COL_WIDTH + PCT_COL_WIDTH + STATUS_COL_WIDTH;
       const datesPerChunk = Math.max(1, Math.floor((usableWidth - fixedWidth) / DATE_COL_WIDTH));
 
       const chunks: string[][] = [];
@@ -87,6 +88,7 @@ export async function generateAttendanceReport(courseId: string, from?: string, 
             ...chunk.map((d) => ({ text: dayjs(d).format("DD/MM"), width: DATE_COL_WIDTH, align: "center" as const })),
             { text: "Pres.", width: PRESENT_COL_WIDTH, align: "right" as const },
             { text: "Att %", width: PCT_COL_WIDTH, align: "right" as const },
+            { text: "Status", width: STATUS_COL_WIDTH, align: "center" as const },
           ],
           { bold: true, fontSize: 7.5 }
         );
@@ -127,7 +129,9 @@ export async function generateAttendanceReport(courseId: string, from?: string, 
 
           const presentDates = presentDatesByStudent.get(student.id) ?? new Set<string>();
           const totalPresent = presentDatesByStudent.get(student.id)?.size ?? 0;
-          const pct = ((totalPresent / dates.length) * 100).toFixed(0);
+          const pctValue = (totalPresent / dates.length) * 100;
+          const pct = pctValue.toFixed(0);
+          const meetsThreshold = pctValue >= settings.attendanceThreshold;
 
           const rowY = doc.y;
           doc.font("Helvetica").fontSize(8);
@@ -147,6 +151,8 @@ export async function generateAttendanceReport(courseId: string, from?: string, 
           doc.text(String(totalPresent), x, rowY, { width: PRESENT_COL_WIDTH, align: "right" });
           x += PRESENT_COL_WIDTH;
           doc.text(`${pct}%`, x, rowY, { width: PCT_COL_WIDTH, align: "right" });
+          x += PCT_COL_WIDTH;
+          drawStatusCell(doc, x, rowY, STATUS_COL_WIDTH, ROW_HEIGHT, meetsThreshold ? "OK" : "LOW", meetsThreshold);
 
           doc.y = rowY + ROW_HEIGHT;
         }
@@ -303,7 +309,8 @@ export async function generateAllAssessmentsReport(courseId: string) {
       }
 
       const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-      const fixedWidth = REG_COL_WIDTH + NAME_COL_WIDTH + PRESENT_COL_WIDTH + PCT_COL_WIDTH + SIGNATURE_COL_WIDTH;
+      const fixedWidth =
+        REG_COL_WIDTH + NAME_COL_WIDTH + PRESENT_COL_WIDTH + PCT_COL_WIDTH + STATUS_COL_WIDTH + SIGNATURE_COL_WIDTH;
       const assessmentsPerChunk = Math.max(1, Math.floor((usableWidth - fixedWidth) / ASSESSMENT_COL_WIDTH));
 
       const chunks: (typeof assessments)[] = [];
@@ -325,6 +332,7 @@ export async function generateAllAssessmentsReport(courseId: string) {
             })),
             { text: "Total", width: PRESENT_COL_WIDTH, align: "right" as const },
             { text: "Score %", width: PCT_COL_WIDTH, align: "right" as const },
+            { text: "Status", width: STATUS_COL_WIDTH, align: "center" as const },
             { text: "Signature", width: SIGNATURE_COL_WIDTH },
           ],
           { bold: true, fontSize: 7.5 }
@@ -366,20 +374,33 @@ export async function generateAllAssessmentsReport(courseId: string) {
 
           const studentMarks = marksByStudent.get(student.id) ?? new Map<string, number>();
           const totalObtained = assessments.reduce((sum, a) => sum + (studentMarks.get(a.id) ?? 0), 0);
-          const pct = totalPossible > 0 ? ((totalObtained / totalPossible) * 100).toFixed(0) : "0";
+          const pctValue = totalPossible > 0 ? (totalObtained / totalPossible) * 100 : 0;
+          const pct = pctValue.toFixed(0);
+          const passes = pctValue >= settings.assessmentPassMark;
 
-          drawTableRow(doc, [
-            { text: student.registrationNumber, width: REG_COL_WIDTH },
-            { text: student.fullName, width: NAME_COL_WIDTH, ellipsis: true },
-            ...chunk.map((a) => ({
-              text: studentMarks.has(a.id) ? String(studentMarks.get(a.id)) : "-",
-              width: ASSESSMENT_COL_WIDTH,
-              align: "right" as const,
-            })),
-            { text: totalObtained.toFixed(1), width: PRESENT_COL_WIDTH, align: "right" as const },
-            { text: `${pct}%`, width: PCT_COL_WIDTH, align: "right" as const },
-            { text: "", width: SIGNATURE_COL_WIDTH },
-          ]);
+          const rowY = doc.y;
+          doc.font("Helvetica").fontSize(8);
+          let x = doc.page.margins.left;
+          doc.text(student.registrationNumber, x, rowY, { width: REG_COL_WIDTH - 4 });
+          x += REG_COL_WIDTH;
+          doc.text(student.fullName, x, rowY, { width: NAME_COL_WIDTH - 4, ellipsis: true });
+          x += NAME_COL_WIDTH;
+
+          for (const a of chunk) {
+            const value = studentMarks.has(a.id) ? String(studentMarks.get(a.id)) : "-";
+            doc.text(value, x, rowY, { width: ASSESSMENT_COL_WIDTH - 4, align: "right" });
+            x += ASSESSMENT_COL_WIDTH;
+          }
+
+          doc.text(totalObtained.toFixed(1), x, rowY, { width: PRESENT_COL_WIDTH - 4, align: "right" });
+          x += PRESENT_COL_WIDTH;
+          doc.text(`${pct}%`, x, rowY, { width: PCT_COL_WIDTH - 4, align: "right" });
+          x += PCT_COL_WIDTH;
+          drawStatusCell(doc, x, rowY, STATUS_COL_WIDTH, ROW_HEIGHT, passes ? "PASS" : "REDO", passes);
+          x += STATUS_COL_WIDTH;
+          // Signature column intentionally left blank for physical sign-off.
+
+          doc.y = rowY + ROW_HEIGHT;
         }
       });
 
