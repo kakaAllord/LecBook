@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const attendanceStatusEnum = z.enum(["PRESENT", "ABSENT", "LATE", "EXCUSED"]);
+export const attendanceStatusEnum = z.enum(["PRESENT", "ABSENT"]);
 
 export const attendanceRecordSchema = z.object({
   studentId: z.string().min(1),

@@ -3,37 +3,41 @@
 import { cn } from "@/lib/utils";
 import type { AttendanceStatus } from "@/types";
 
-const OPTIONS: { value: AttendanceStatus; label: string; active: string }[] = [
-  { value: "PRESENT", label: "Present", active: "bg-emerald-600 text-white border-emerald-600" },
-  { value: "ABSENT", label: "Absent", active: "bg-rose-600 text-white border-rose-600" },
-  { value: "LATE", label: "Late", active: "bg-amber-500 text-white border-amber-500" },
-  { value: "EXCUSED", label: "Excused", active: "bg-sky-600 text-white border-sky-600" },
-];
-
-export function AttendanceStatusPicker({
+export function AttendanceStatusToggle({
   value,
   onChange,
 }: {
   value: AttendanceStatus;
   onChange: (status: AttendanceStatus) => void;
 }) {
+  const present = value === "PRESENT";
+
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {OPTIONS.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => onChange(opt.value)}
-          className={cn(
-            "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-            value === opt.value
-              ? opt.active
-              : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-          )}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={present}
+      aria-label={present ? "Present, tap to mark absent" : "Absent, tap to mark present"}
+      onClick={() => onChange(present ? "ABSENT" : "PRESENT")}
+      className={cn(
+        "relative h-8 w-[92px] shrink-0 rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900",
+        present ? "bg-emerald-500 focus-visible:ring-emerald-500" : "bg-rose-500 focus-visible:ring-rose-500"
+      )}
+    >
+      <span
+        className={cn(
+          "pointer-events-none absolute inset-0 flex items-center px-2.5 text-xs font-semibold text-white",
+          present ? "justify-start" : "justify-end"
+        )}
+      >
+        {present ? "Present" : "Absent"}
+      </span>
+      <span
+        className={cn(
+          "pointer-events-none absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow-sm transition-transform duration-200",
+          present ? "translate-x-0" : "translate-x-[60px]"
+        )}
+      />
+    </button>
   );
 }

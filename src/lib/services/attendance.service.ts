@@ -101,22 +101,17 @@ export async function getAttendanceHistory(
     orderBy: { date: "desc" },
   });
 
-  const byDate = new Map<
-    string,
-    { date: Date; present: number; absent: number; late: number; excused: number; total: number }
-  >();
+  const byDate = new Map<string, { date: Date; present: number; absent: number; total: number }>();
 
   for (const r of records) {
     const key = r.date.toISOString();
     if (!byDate.has(key)) {
-      byDate.set(key, { date: r.date, present: 0, absent: 0, late: 0, excused: 0, total: 0 });
+      byDate.set(key, { date: r.date, present: 0, absent: 0, total: 0 });
     }
     const bucket = byDate.get(key)!;
     bucket.total += 1;
     if (r.status === "PRESENT") bucket.present += 1;
     if (r.status === "ABSENT") bucket.absent += 1;
-    if (r.status === "LATE") bucket.late += 1;
-    if (r.status === "EXCUSED") bucket.excused += 1;
   }
 
   return Array.from(byDate.values()).sort((a, b) => b.date.getTime() - a.date.getTime());

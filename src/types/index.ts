@@ -1,5 +1,5 @@
 export type StudentStatus = "ACTIVE" | "INACTIVE";
-export type AttendanceStatus = "PRESENT" | "ABSENT" | "LATE" | "EXCUSED";
+export type AttendanceStatus = "PRESENT" | "ABSENT";
 
 export type Course = {
   id: string;
@@ -52,8 +52,6 @@ export type AttendanceHistoryEntry = {
   date: string;
   present: number;
   absent: number;
-  late: number;
-  excused: number;
   total: number;
 };
 
@@ -102,9 +100,14 @@ export type DashboardSummary = {
   todayAttendance: {
     present: number;
     absent: number;
-    late: number;
-    excused: number;
     total: number;
   };
   recentAssessments: Assessment[];
+};
+
+export type Settings = {
+  id: string;
+  institutionName: string;
+  institutionLogo: string | null;
+  updatedAt: string;
 };

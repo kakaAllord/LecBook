@@ -78,8 +78,6 @@ export default function AttendanceHistoryPage() {
               <TH>Date</TH>
               <TH>Present</TH>
               <TH>Absent</TH>
-              <TH>Late</TH>
-              <TH>Excused</TH>
               <TH>Total</TH>
               <TH className="text-right">Actions</TH>
             </TR>
@@ -92,8 +90,6 @@ export default function AttendanceHistoryPage() {
                 </TD>
                 <TD>{entry.present}</TD>
                 <TD>{entry.absent}</TD>
-                <TD>{entry.late}</TD>
-                <TD>{entry.excused}</TD>
                 <TD>{entry.total}</TD>
                 <TD>
                   <div className="flex justify-end">

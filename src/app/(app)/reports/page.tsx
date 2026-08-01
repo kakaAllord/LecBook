@@ -60,7 +60,7 @@ function AttendanceReportCard({ courses }: { courses: Course[] }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Includes course details, date range, student list and attendance percentage.
+          A tick-sheet register: one row per student, one column per date, with attendance totals.
         </p>
         <div>
           <Label htmlFor="att-course">Course</Label>

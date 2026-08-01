@@ -24,16 +24,5 @@ export function studentStatusColor(status: string): BadgeColor {
 }
 
 export function attendanceStatusColor(status: string): BadgeColor {
-  switch (status) {
-    case "PRESENT":
-      return "emerald";
-    case "ABSENT":
-      return "rose";
-    case "LATE":
-      return "amber";
-    case "EXCUSED":
-      return "sky";
-    default:
-      return "slate";
-  }
+  return status === "PRESENT" ? "emerald" : "rose";
 }

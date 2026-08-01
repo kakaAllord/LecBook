@@ -18,6 +18,7 @@ model User {
 model Settings {
   id              String   @id @default(cuid())
   institutionName String   @default("Your Institution Name")
+  institutionLogo String?
   updatedAt       DateTime @updatedAt
 }
 
@@ -58,8 +59,6 @@ model Student {
 enum AttendanceStatus {
   PRESENT
   ABSENT
-  LATE
-  EXCUSED
 }
 
 model Attendance {

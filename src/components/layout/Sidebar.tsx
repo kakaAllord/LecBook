@@ -40,9 +40,16 @@ export function Sidebar({ userName }: { userName: string }) {
 
   const { data: settings } = useQuery({
     queryKey: ["settings"],
-    queryFn: () => api.get<{ institutionName: string }>("/api/settings"),
+    queryFn: () => api.get<{ institutionName: string; institutionLogo: string | null }>("/api/settings"),
     staleTime: 5 * 60_000,
   });
+
+  const brandMark = settings?.institutionLogo ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={settings.institutionLogo} alt="" className="h-5 w-5 shrink-0 rounded object-contain" />
+  ) : (
+    <GraduationCap className="h-5 w-5 shrink-0 text-indigo-600" />
+  );
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -86,7 +93,7 @@ export function Sidebar({ userName }: { userName: string }) {
     <>
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 lg:hidden dark:border-slate-800">
         <div className="flex items-center gap-2 font-semibold text-slate-900 dark:text-slate-100">
-          <GraduationCap className="h-5 w-5 text-indigo-600" />
+          {brandMark}
           LRMS
         </div>
         <button
@@ -107,7 +114,7 @@ export function Sidebar({ userName }: { userName: string }) {
       >
         <div className="hidden flex-col gap-1 border-b border-slate-200 px-5 py-4 lg:flex dark:border-slate-800">
           <div className="flex items-center gap-2 font-semibold text-slate-900 dark:text-slate-100">
-            <GraduationCap className="h-5 w-5 text-indigo-600" />
+            {brandMark}
             LRMS
           </div>
           {settings?.institutionName && (

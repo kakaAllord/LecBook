@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
-import { AttendanceStatusPicker } from "@/components/attendance/AttendanceStatusPicker";
+import { AttendanceStatusToggle } from "@/components/attendance/AttendanceStatusPicker";
 
 type DraftRecord = { status: AttendanceStatus; remarks: string };
 
@@ -77,8 +77,6 @@ export function AttendanceBoard() {
     return {
       present: values.filter((v) => v.status === "PRESENT").length,
       absent: values.filter((v) => v.status === "ABSENT").length,
-      late: values.filter((v) => v.status === "LATE").length,
-      excused: values.filter((v) => v.status === "EXCUSED").length,
     };
   }, [drafts]);
 
@@ -129,56 +127,87 @@ export function AttendanceBoard() {
             <span className="rounded-full bg-rose-100 px-3 py-1 font-medium text-rose-700 dark:bg-rose-500/10 dark:text-rose-400">
               Absent: {summary.absent}
             </span>
-            <span className="rounded-full bg-amber-100 px-3 py-1 font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
-              Late: {summary.late}
-            </span>
-            <span className="rounded-full bg-sky-100 px-3 py-1 font-medium text-sky-700 dark:bg-sky-500/10 dark:text-sky-400">
-              Excused: {summary.excused}
-            </span>
           </div>
 
-          <Table>
-            <THead>
-              <TR>
-                <TH>Reg. No</TH>
-                <TH>Name</TH>
-                <TH>Status</TH>
-                <TH>Remarks</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {data.students.map(({ student }) => {
-                const draft = drafts[student.id] ?? { status: "PRESENT" as AttendanceStatus, remarks: "" };
-                return (
-                  <TR key={student.id}>
-                    <TD className="font-medium text-slate-900 dark:text-slate-100">{student.registrationNumber}</TD>
-                    <TD>{student.fullName}</TD>
-                    <TD>
-                      <AttendanceStatusPicker
-                        value={draft.status}
-                        onChange={(status) =>
-                          setDrafts((prev) => ({ ...prev, [student.id]: { ...draft, status } }))
-                        }
-                      />
-                    </TD>
-                    <TD>
-                      <Input
-                        value={draft.remarks}
-                        placeholder="Optional"
-                        onChange={(e) =>
-                          setDrafts((prev) => ({ ...prev, [student.id]: { ...draft, remarks: e.target.value } }))
-                        }
-                        className="min-w-[160px]"
-                      />
-                    </TD>
-                  </TR>
-                );
-              })}
-            </TBody>
-          </Table>
+          {/* Mobile: stacked cards, one per student */}
+          <div className="space-y-3 md:hidden">
+            {data.students.map(({ student }) => {
+              const draft = drafts[student.id] ?? { status: "PRESENT" as AttendanceStatus, remarks: "" };
+              return (
+                <div
+                  key={student.id}
+                  className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-slate-900 dark:text-slate-100">{student.fullName}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{student.registrationNumber}</p>
+                    </div>
+                    <AttendanceStatusToggle
+                      value={draft.status}
+                      onChange={(status) =>
+                        setDrafts((prev) => ({ ...prev, [student.id]: { ...draft, status } }))
+                      }
+                    />
+                  </div>
+                  <Input
+                    value={draft.remarks}
+                    placeholder="Remarks (optional)"
+                    onChange={(e) =>
+                      setDrafts((prev) => ({ ...prev, [student.id]: { ...draft, remarks: e.target.value } }))
+                    }
+                    className="mt-3"
+                  />
+                </div>
+              );
+            })}
+          </div>
 
-          <div className="flex justify-end">
-            <Button onClick={() => saveMutation.mutate()} loading={saveMutation.isPending}>
+          {/* Desktop: table */}
+          <div className="hidden md:block">
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Reg. No</TH>
+                  <TH>Name</TH>
+                  <TH>Status</TH>
+                  <TH>Remarks</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {data.students.map(({ student }) => {
+                  const draft = drafts[student.id] ?? { status: "PRESENT" as AttendanceStatus, remarks: "" };
+                  return (
+                    <TR key={student.id}>
+                      <TD className="font-medium text-slate-900 dark:text-slate-100">{student.registrationNumber}</TD>
+                      <TD>{student.fullName}</TD>
+                      <TD>
+                        <AttendanceStatusToggle
+                          value={draft.status}
+                          onChange={(status) =>
+                            setDrafts((prev) => ({ ...prev, [student.id]: { ...draft, status } }))
+                          }
+                        />
+                      </TD>
+                      <TD>
+                        <Input
+                          value={draft.remarks}
+                          placeholder="Optional"
+                          onChange={(e) =>
+                            setDrafts((prev) => ({ ...prev, [student.id]: { ...draft, remarks: e.target.value } }))
+                          }
+                          className="min-w-[160px]"
+                        />
+                      </TD>
+                    </TR>
+                  );
+                })}
+              </TBody>
+            </Table>
+          </div>
+
+          <div className="flex justify-center sm:justify-end">
+            <Button onClick={() => saveMutation.mutate()} loading={saveMutation.isPending} className="w-full sm:w-auto">
               <Save className="h-4 w-4" /> Save Attendance
             </Button>
           </div>

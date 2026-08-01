@@ -25,16 +25,12 @@ export async function getDashboardSummary() {
   const todayAttendanceSummary = {
     present: 0,
     absent: 0,
-    late: 0,
-    excused: 0,
     total: 0,
   };
   for (const row of todayAttendance) {
     todayAttendanceSummary.total += row._count;
     if (row.status === "PRESENT") todayAttendanceSummary.present = row._count;
     if (row.status === "ABSENT") todayAttendanceSummary.absent = row._count;
-    if (row.status === "LATE") todayAttendanceSummary.late = row._count;
-    if (row.status === "EXCUSED") todayAttendanceSummary.excused = row._count;
   }
 
   return {

@@ -123,8 +123,8 @@ async function main() {
   }
   console.log("Created assessment marks");
 
-  const attendanceStatuses: Array<"PRESENT" | "ABSENT" | "LATE" | "EXCUSED"> = [
-    "PRESENT", "PRESENT", "PRESENT", "PRESENT", "ABSENT", "LATE", "EXCUSED",
+  const attendanceStatuses: Array<"PRESENT" | "ABSENT"> = [
+    "PRESENT", "PRESENT", "PRESENT", "PRESENT", "ABSENT",
   ];
   let attendanceCount = 0;
   for (let d = 0; d < 10; d++) {

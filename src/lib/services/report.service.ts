@@ -1,8 +1,15 @@
 import dayjs from "dayjs";
 import { prisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api-response";
-import { bufferPdf, addReportHeader, drawTableRow } from "@/lib/pdf";
+import { bufferPdf, addReportHeader, drawTableRow, drawTick } from "@/lib/pdf";
 import { getSettings } from "@/lib/services/settings.service";
+
+const REG_COL_WIDTH = 65;
+const NAME_COL_WIDTH = 135;
+const PRESENT_COL_WIDTH = 42;
+const PCT_COL_WIDTH = 40;
+const DATE_COL_WIDTH = 24;
+const ROW_HEIGHT = 16;
 
 export async function generateAttendanceReport(courseId: string, from?: string, to?: string) {
   const [course, settings] = await Promise.all([
@@ -15,13 +22,28 @@ export async function generateAttendanceReport(courseId: string, from?: string, 
   if (from) dateFilter.gte = dayjs(from).startOf("day").toDate();
   if (to) dateFilter.lte = dayjs(to).endOf("day").toDate();
 
-  const students = await prisma.student.findMany({
-    where: { courseId, status: "ACTIVE" },
-    orderBy: { fullName: "asc" },
-    include: {
-      attendance: Object.keys(dateFilter).length ? { where: { date: dateFilter } } : true,
-    },
-  });
+  const [students, records] = await Promise.all([
+    prisma.student.findMany({
+      where: { courseId, status: "ACTIVE" },
+      orderBy: { fullName: "asc" },
+    }),
+    prisma.attendance.findMany({
+      where: {
+        student: { courseId },
+        ...(Object.keys(dateFilter).length ? { date: dateFilter } : {}),
+      },
+      orderBy: { date: "asc" },
+    }),
+  ]);
+
+  const dates = Array.from(new Set(records.map((r) => r.date.toISOString()))).sort();
+
+  const presentDatesByStudent = new Map<string, Set<string>>();
+  for (const r of records) {
+    if (r.status !== "PRESENT") continue;
+    if (!presentDatesByStudent.has(r.studentId)) presentDatesByStudent.set(r.studentId, new Set());
+    presentDatesByStudent.get(r.studentId)!.add(r.date.toISOString());
+  }
 
   const rangeLabel =
     from && to
@@ -30,66 +52,112 @@ export async function generateAttendanceReport(courseId: string, from?: string, 
 
   const subtitle = `${course.name} · Level ${course.level} · Semester ${course.semester} · ${course.academicYear}\nDate Range: ${rangeLabel}`;
 
-  const colWidths = { reg: 75, name: 145, present: 45, absent: 45, late: 40, excused: 50, total: 40, pct: 55 };
-
-  const pdf = await bufferPdf((doc) => {
-    addReportHeader(doc, settings.institutionName, "Attendance Report", subtitle);
-
-    drawTableRow(
-      doc,
-      [
-        { text: "Reg. No", width: colWidths.reg },
-        { text: "Name", width: colWidths.name },
-        { text: "Present", width: colWidths.present, align: "right" },
-        { text: "Absent", width: colWidths.absent, align: "right" },
-        { text: "Late", width: colWidths.late, align: "right" },
-        { text: "Excused", width: colWidths.excused, align: "right" },
-        { text: "Total", width: colWidths.total, align: "right" },
-        { text: "Attend %", width: colWidths.pct, align: "right" },
-      ],
-      { bold: true }
-    );
-    doc
-      .strokeColor("#dddddd")
-      .moveTo(doc.page.margins.left, doc.y)
-      .lineTo(doc.page.width - doc.page.margins.right, doc.y)
-      .stroke();
-    doc.moveDown(0.3);
-
-    for (const student of students) {
-      const present = student.attendance.filter((a) => a.status === "PRESENT").length;
-      const absent = student.attendance.filter((a) => a.status === "ABSENT").length;
-      const late = student.attendance.filter((a) => a.status === "LATE").length;
-      const excused = student.attendance.filter((a) => a.status === "EXCUSED").length;
-      const total = student.attendance.length;
-      const pct = total > 0 ? ((present / total) * 100).toFixed(1) : "0.0";
-
-      if (doc.y > doc.page.height - doc.page.margins.bottom - 40) {
-        doc.addPage();
+  const pdf = await bufferPdf(
+    (doc) => {
+      if (students.length === 0 || dates.length === 0) {
+        addReportHeader(doc, settings.institutionName, "Attendance Register", subtitle, settings.institutionLogo);
+        doc
+          .font("Helvetica")
+          .fontSize(10)
+          .text(
+            students.length === 0
+              ? "No active students found for this course."
+              : "No attendance has been recorded for this course yet."
+          );
+        return;
       }
 
-      drawTableRow(doc, [
-        { text: student.registrationNumber, width: colWidths.reg },
-        { text: student.fullName, width: colWidths.name },
-        { text: String(present), width: colWidths.present, align: "right" },
-        { text: String(absent), width: colWidths.absent, align: "right" },
-        { text: String(late), width: colWidths.late, align: "right" },
-        { text: String(excused), width: colWidths.excused, align: "right" },
-        { text: String(total), width: colWidths.total, align: "right" },
-        { text: `${pct}%`, width: colWidths.pct, align: "right" },
-      ]);
-    }
+      const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const fixedWidth = REG_COL_WIDTH + NAME_COL_WIDTH + PRESENT_COL_WIDTH + PCT_COL_WIDTH;
+      const datesPerChunk = Math.max(1, Math.floor((usableWidth - fixedWidth) / DATE_COL_WIDTH));
 
-    if (students.length === 0) {
-      doc.font("Helvetica").fontSize(10).text("No active students found for this course.");
-    }
+      const chunks: string[][] = [];
+      for (let i = 0; i < dates.length; i += datesPerChunk) {
+        chunks.push(dates.slice(i, i + datesPerChunk));
+      }
 
-    doc.moveDown(1);
-    doc
-      .fontSize(8)
-      .fillColor("#888888")
-      .text(`Generated on ${dayjs().format("DD MMM YYYY, HH:mm")}`, { align: "right" });
-  });
+      const drawHeaderRow = (chunk: string[]) => {
+        drawTableRow(
+          doc,
+          [
+            { text: "Reg. No", width: REG_COL_WIDTH },
+            { text: "Name", width: NAME_COL_WIDTH },
+            ...chunk.map((d) => ({ text: dayjs(d).format("DD/MM"), width: DATE_COL_WIDTH, align: "center" as const })),
+            { text: "Pres.", width: PRESENT_COL_WIDTH, align: "right" as const },
+            { text: "Att %", width: PCT_COL_WIDTH, align: "right" as const },
+          ],
+          { bold: true, fontSize: 7.5 }
+        );
+        doc
+          .strokeColor("#dddddd")
+          .moveTo(doc.page.margins.left, doc.y)
+          .lineTo(doc.page.width - doc.page.margins.right, doc.y)
+          .stroke();
+        doc.moveDown(0.3);
+      };
+
+      const pageLabel = (chunkIndex: number) =>
+        chunks.length > 1 ? `${subtitle} · Page ${chunkIndex + 1} of ${chunks.length}` : subtitle;
+
+      chunks.forEach((chunk, chunkIndex) => {
+        if (chunkIndex > 0) doc.addPage();
+        addReportHeader(
+          doc,
+          settings.institutionName,
+          "Attendance Register",
+          pageLabel(chunkIndex),
+          settings.institutionLogo
+        );
+        drawHeaderRow(chunk);
+
+        for (const student of students) {
+          if (doc.y > doc.page.height - doc.page.margins.bottom - ROW_HEIGHT) {
+            doc.addPage();
+            addReportHeader(
+              doc,
+              settings.institutionName,
+              "Attendance Register",
+              pageLabel(chunkIndex),
+              settings.institutionLogo
+            );
+            drawHeaderRow(chunk);
+          }
+
+          const presentDates = presentDatesByStudent.get(student.id) ?? new Set<string>();
+          const totalPresent = presentDatesByStudent.get(student.id)?.size ?? 0;
+          const pct = ((totalPresent / dates.length) * 100).toFixed(0);
+
+          const rowY = doc.y;
+          doc.font("Helvetica").fontSize(8);
+          let x = doc.page.margins.left;
+          doc.text(student.registrationNumber, x, rowY, { width: REG_COL_WIDTH });
+          x += REG_COL_WIDTH;
+          doc.text(student.fullName, x, rowY, { width: NAME_COL_WIDTH, ellipsis: true });
+          x += NAME_COL_WIDTH;
+
+          for (const d of chunk) {
+            if (presentDates.has(d)) {
+              drawTick(doc, x + DATE_COL_WIDTH / 2 - 4, rowY + 1, 8);
+            }
+            x += DATE_COL_WIDTH;
+          }
+
+          doc.text(String(totalPresent), x, rowY, { width: PRESENT_COL_WIDTH, align: "right" });
+          x += PRESENT_COL_WIDTH;
+          doc.text(`${pct}%`, x, rowY, { width: PCT_COL_WIDTH, align: "right" });
+
+          doc.y = rowY + ROW_HEIGHT;
+        }
+      });
+
+      doc.moveDown(1);
+      doc
+        .fontSize(8)
+        .fillColor("#888888")
+        .text(`Generated on ${dayjs().format("DD MMM YYYY, HH:mm")}`, { align: "right" });
+    },
+    { layout: "landscape" }
+  );
 
   return { pdf, filename: `attendance-${course.name}-${dayjs().format("YYYYMMDD")}.pdf` };
 }
@@ -121,7 +189,7 @@ export async function generateAssessmentReport(assessmentId: string) {
   const colWidths = { reg: 90, name: 210, marks: 90, remarks: 125 };
 
   const pdf = await bufferPdf((doc) => {
-    addReportHeader(doc, settings.institutionName, "Assessment Report", subtitle);
+    addReportHeader(doc, settings.institutionName, "Assessment Report", subtitle, settings.institutionLogo);
 
     doc.font("Helvetica-Bold").fontSize(10);
     doc.text(
