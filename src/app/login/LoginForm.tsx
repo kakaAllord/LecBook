@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
-import { GraduationCap } from "lucide-react";
 import { toast } from "sonner";
 import { loginSchema, type LoginInput } from "@/lib/validators/auth";
 import { api, ApiClientError } from "@/lib/api-client";
@@ -41,9 +40,8 @@ export function LoginForm() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-2">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white">
-            <GraduationCap className="h-6 w-6" />
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="LecBook" className="h-14 w-14" />
           <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
             Lecturer Record Management
           </h1>

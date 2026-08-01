@@ -13,7 +13,6 @@ import {
   FileBarChart,
   Settings as SettingsIcon,
   LogOut,
-  GraduationCap,
   Menu,
   X,
 } from "lucide-react";
@@ -44,11 +43,13 @@ export function Sidebar({ userName }: { userName: string }) {
     staleTime: 5 * 60_000,
   });
 
-  const brandMark = settings?.institutionLogo ? (
+  const brandMark = (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={settings.institutionLogo} alt="" className="h-5 w-5 shrink-0 rounded object-contain" />
-  ) : (
-    <GraduationCap className="h-5 w-5 shrink-0 text-indigo-600" />
+    <img
+      src={settings?.institutionLogo || "/logo.svg"}
+      alt=""
+      className="h-5 w-5 shrink-0 rounded object-contain"
+    />
   );
 
   async function handleLogout() {
