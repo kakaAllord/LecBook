@@ -101,6 +101,14 @@ function AssessmentReportCard({ courses }: { courses: Course[] }) {
   });
 
   function download() {
+    if (assessmentId === "__all__") {
+      if (!courseId) {
+        toast.error("Select a course first to download all its assessments");
+        return;
+      }
+      window.open(`/api/reports/assessment?courseId=${courseId}`, "_blank");
+      return;
+    }
     if (!assessmentId) {
       toast.error("Select an assessment first");
       return;
@@ -117,7 +125,8 @@ function AssessmentReportCard({ courses }: { courses: Course[] }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          Includes marks per student, average, highest and lowest scores.
+          Includes marks per student and a signature column. Choose one assessment, or all assessments for a
+          course to get a combined score summary.
         </p>
         <div>
           <Label htmlFor="ass-course">Course</Label>
@@ -141,6 +150,7 @@ function AssessmentReportCard({ courses }: { courses: Course[] }) {
           <Label htmlFor="ass-assessment">Assessment</Label>
           <Select id="ass-assessment" value={assessmentId} onChange={(e) => setAssessmentId(e.target.value)}>
             <option value="">Select an assessment...</option>
+            <option value="__all__">All Assessments{courseId ? "" : " (select a course first)"}</option>
             {assessments?.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.title} · {a.assessmentType.name} · {a.course.name}

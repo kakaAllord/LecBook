@@ -76,17 +76,20 @@ export function drawTick(doc: PDFKit.PDFDocument, x: number, y: number, size = 8
 
 export function drawTableRow(
   doc: PDFKit.PDFDocument,
-  columns: { text: string; width: number; align?: "left" | "right" | "center" }[],
+  columns: { text: string; width: number; align?: "left" | "right" | "center"; ellipsis?: boolean }[],
   opts: { bold?: boolean; fontSize?: number } = {}
 ) {
   const startX = doc.page.margins.left;
   const y = doc.y;
-  doc.font(opts.bold ? "Helvetica-Bold" : "Helvetica").fontSize(opts.fontSize ?? 9);
+  const fontSize = opts.fontSize ?? 9;
+  doc.font(opts.bold ? "Helvetica-Bold" : "Helvetica").fontSize(fontSize);
 
   let x = startX;
   for (const col of columns) {
-    doc.text(col.text, x, y, { width: col.width, align: col.align ?? "left" });
+    doc.text(col.text, x, y, { width: col.width - 4, align: col.align ?? "left", ellipsis: col.ellipsis });
     x += col.width;
   }
-  doc.moveDown(0.5);
+  // Advance by an explicit row height rather than doc.moveDown(), whose line-height
+  // heuristic under-shoots for these fixed-position multi-column rows and causes overlap.
+  doc.y = y + fontSize * 1.7;
 }
