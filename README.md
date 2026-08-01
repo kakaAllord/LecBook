@@ -8,7 +8,7 @@ A single Next.js application (frontend + backend in one project, one deploy) tha
 - **Styling:** Tailwind CSS v4
 - **Data fetching:** TanStack Query
 - **Forms & validation:** React Hook Form + Zod (client and server side)
-- **Database:** Prisma ORM on SQLite by default (`prisma/dev.db`) — swap `DATABASE_URL` to a PostgreSQL connection string for production, no schema changes required
+- **Database:** Prisma ORM on PostgreSQL. Prisma's datasource `provider` is fixed at build time (it's not inferred from the URL scheme), so switching databases means editing `prisma/schema.prisma` too, not just `DATABASE_URL`
 - **Auth:** Single-lecturer login, JWT stored in an httpOnly cookie, protected routes via `middleware.ts`
 - **PDF reports:** PDFKit
 - **Dates:** Day.js
@@ -18,7 +18,8 @@ A single Next.js application (frontend + backend in one project, one deploy) tha
 ```
 prisma/
   schema.prisma        Data model (User, Settings, Course, Student, Attendance, AssessmentType, Assessment, AssessmentMark)
-  seed.ts               Seed script (lecturer login + sample courses/students/assessments/attendance)
+  seed.ts               Full seed script (lecturer login + sample courses/students/assessments/attendance)
+  seed-credentials.ts    Credentials-only seed (used standalone by `npm run db:seed:creds`, and by seed.ts)
   clear.ts               Wipes everything except the User table (used by `npm run db:clear`)
 scripts/
   generate-getting-started-pdf.ts   Generates public/getting-started-guide.pdf (used by `npm run docs:guide`)
@@ -57,7 +58,7 @@ cp .env.example .env
 ```
 
 ```
-DATABASE_URL="file:./dev.db"          # SQLite for local dev; use a postgres:// URL in production
+DATABASE_URL="postgresql://user:password@host:5432/dbname"
 JWT_SECRET="change-me-to-a-long-random-string"
 ```
 
@@ -65,15 +66,20 @@ JWT_SECRET="change-me-to-a-long-random-string"
 
 ```bash
 npm run db:migrate   # applies prisma/migrations and generates the Prisma client
-npm run db:seed      # optional: seeds a lecturer account + sample data
+npm run db:seed      # optional: seeds a lecturer account + sample demo data
 ```
 
-The seed script creates a lecturer login:
+Two narrower seed options are also available:
+
+- `npm run db:seed:creds` — seeds (or updates) only the lecturer login, no demo data. Useful for a real/production database.
+- `npm run db:seed:all` — same as `npm run db:seed` (full demo data), named explicitly for symmetry with `db:seed:creds`.
+
+By default the seeded lecturer login is:
 
 - **Email:** `lecturer@example.com`
 - **Password:** `REDACTED_SEED_PASSWORD`
 
-There is no in-app way to change these credentials by design — update them directly in `prisma/seed.ts` (or in the database) if needed.
+Override these before seeding by setting `SEED_LECTURER_EMAIL`, `SEED_LECTURER_PASSWORD`, and `SEED_LECTURER_NAME` env vars — recommended for any database that isn't a local throwaway. There is no in-app way to change credentials afterward by design — re-run `db:seed:creds` (with new env vars) or update the `User` row directly if needed.
 
 ### 4. Run the app
 
@@ -99,7 +105,9 @@ npm run start
 | `npm run start` | Run the production build |
 | `npm run lint` | Run ESLint |
 | `npm run db:migrate` | Run Prisma migrations |
-| `npm run db:seed` | Seed the database with sample courses/students/assessments/attendance |
+| `npm run db:seed` | Seed the database with a lecturer login plus sample courses/students/assessments/attendance |
+| `npm run db:seed:creds` | Seed (or update) only the lecturer login — no demo data |
+| `npm run db:seed:all` | Alias for `npm run db:seed` |
 | `npm run db:studio` | Open Prisma Studio to inspect the database |
 | `npm run db:clear` | **Destructive.** Wipes courses, students, attendance, assessments, marks and settings — leaves only the `User` table (login credentials) intact. Use this to reset a demo/training environment back to a blank slate without losing the login. |
 | `npm run docs:guide` | Regenerates `public/getting-started-guide.pdf` (optionally pass an institution name, e.g. `npm run docs:guide -- "My College"`) |

@@ -1,6 +1,6 @@
-import bcrypt from "bcryptjs";
 import dayjs from "dayjs";
 import { PrismaClient } from "@prisma/client";
+import { seedCredentials } from "./seed-credentials";
 
 const prisma = new PrismaClient();
 
@@ -27,17 +27,7 @@ function randomInt(min: number, max: number): number {
 async function main() {
   console.log("Seeding database...");
 
-  const passwordHash = await bcrypt.hash("REDACTED_SEED_PASSWORD", 10);
-  const lecturer = await prisma.user.upsert({
-    where: { email: "lecturer@example.com" },
-    update: { password: passwordHash },
-    create: {
-      name: "Wickleaf",
-      email: "lecturer@example.com",
-      password: passwordHash,
-    },
-  });
-  console.log(`Lecturer user ready: ${lecturer.email}`);
+  await seedCredentials(prisma);
 
   const courseData = [
     { name: "Electrical Engineering", level: "Level 5", semester: "Semester II", academicYear: "2026" },
