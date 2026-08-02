@@ -40,15 +40,19 @@ function AttendanceReportCard({ courses }: { courses: Course[] }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
-  function download() {
-    if (!courseId) {
-      toast.error("Select a course first");
-      return;
-    }
+  const href = (() => {
+    if (!courseId) return undefined;
     const params = new URLSearchParams({ courseId });
     if (from) params.set("from", from);
     if (to) params.set("to", to);
-    window.open(`/api/reports/attendance?${params.toString()}`, "_blank");
+    return `/api/reports/attendance?${params.toString()}`;
+  })();
+
+  function handleClick(e: React.MouseEvent) {
+    if (!courseId) {
+      e.preventDefault();
+      toast.error("Select a course first");
+    }
   }
 
   return (
@@ -83,9 +87,11 @@ function AttendanceReportCard({ courses }: { courses: Course[] }) {
             <Input id="att-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} max={dayjs().format("YYYY-MM-DD")} />
           </div>
         </div>
-        <Button onClick={download} className="w-full">
-          <Download className="h-4 w-4" /> Download PDF
-        </Button>
+        <a href={href ?? "#"} target="_blank" rel="noreferrer" onClick={handleClick}>
+          <Button type="button" className="w-full">
+            <Download className="h-4 w-4" /> Download PDF
+          </Button>
+        </a>
       </CardContent>
     </Card>
   );
@@ -100,20 +106,27 @@ function AssessmentReportCard({ courses }: { courses: Course[] }) {
     queryFn: () => api.get<Assessment[]>(`/api/assessments${courseId ? `?courseId=${courseId}` : ""}`),
   });
 
-  function download() {
+  const href =
+    assessmentId === "__all__"
+      ? courseId
+        ? `/api/reports/assessment?courseId=${courseId}`
+        : undefined
+      : assessmentId
+        ? `/api/reports/assessment?assessmentId=${assessmentId}`
+        : undefined;
+
+  function handleClick(e: React.MouseEvent) {
     if (assessmentId === "__all__") {
       if (!courseId) {
+        e.preventDefault();
         toast.error("Select a course first to download all its assessments");
-        return;
       }
-      window.open(`/api/reports/assessment?courseId=${courseId}`, "_blank");
       return;
     }
     if (!assessmentId) {
+      e.preventDefault();
       toast.error("Select an assessment first");
-      return;
     }
-    window.open(`/api/reports/assessment?assessmentId=${assessmentId}`, "_blank");
   }
 
   return (
@@ -158,9 +171,11 @@ function AssessmentReportCard({ courses }: { courses: Course[] }) {
             ))}
           </Select>
         </div>
-        <Button onClick={download} className="w-full">
-          <Download className="h-4 w-4" /> Download PDF
-        </Button>
+        <a href={href ?? "#"} target="_blank" rel="noreferrer" onClick={handleClick}>
+          <Button type="button" className="w-full">
+            <Download className="h-4 w-4" /> Download PDF
+          </Button>
+        </a>
       </CardContent>
     </Card>
   );
