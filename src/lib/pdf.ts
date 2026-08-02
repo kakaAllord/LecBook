@@ -92,22 +92,42 @@ export function drawStatusCell(
   doc.fillColor("#000000").font("Helvetica").fontSize(8);
 }
 
+export function drawRowGrid(doc: PDFKit.PDFDocument, x: number, y: number, widths: number[], rowHeight: number) {
+  doc.save();
+  doc.strokeColor("#bbbbbb").lineWidth(0.5);
+  let cx = x;
+  for (const width of widths) {
+    doc.rect(cx, y, width, rowHeight).stroke();
+    cx += width;
+  }
+  doc.restore();
+}
+
 export function drawTableRow(
   doc: PDFKit.PDFDocument,
   columns: { text: string; width: number; align?: "left" | "right" | "center"; ellipsis?: boolean }[],
-  opts: { bold?: boolean; fontSize?: number } = {}
+  opts: { bold?: boolean; fontSize?: number; rowHeight?: number } = {}
 ) {
   const startX = doc.page.margins.left;
   const y = doc.y;
   const fontSize = opts.fontSize ?? 9;
+  const rowHeight = opts.rowHeight ?? fontSize * 1.7;
   doc.font(opts.bold ? "Helvetica-Bold" : "Helvetica").fontSize(fontSize);
+
+  drawRowGrid(
+    doc,
+    startX,
+    y,
+    columns.map((c) => c.width),
+    rowHeight
+  );
 
   let x = startX;
   for (const col of columns) {
-    doc.text(col.text, x, y, { width: col.width - 4, align: col.align ?? "left", ellipsis: col.ellipsis });
+    doc.text(col.text, x + 2, y + 2, { width: col.width - 4, align: col.align ?? "left", ellipsis: col.ellipsis });
     x += col.width;
   }
   // Advance by an explicit row height rather than doc.moveDown(), whose line-height
   // heuristic under-shoots for these fixed-position multi-column rows and causes overlap.
-  doc.y = y + fontSize * 1.7;
+  doc.y = y + rowHeight;
 }

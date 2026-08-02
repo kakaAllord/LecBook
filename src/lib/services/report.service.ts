@@ -1,7 +1,7 @@
 import dayjs from "dayjs";
 import { prisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api-response";
-import { bufferPdf, addReportHeader, drawTableRow, drawTick, drawStatusCell } from "@/lib/pdf";
+import { bufferPdf, addReportHeader, drawTableRow, drawTick, drawStatusCell, drawRowGrid } from "@/lib/pdf";
 import { getSettings } from "@/lib/services/settings.service";
 
 const REG_COL_WIDTH = 65;
@@ -90,14 +90,8 @@ export async function generateAttendanceReport(courseId: string, from?: string, 
             { text: "Att %", width: PCT_COL_WIDTH, align: "right" as const },
             { text: "Status", width: STATUS_COL_WIDTH, align: "center" as const },
           ],
-          { bold: true, fontSize: 7.5 }
+          { bold: true, fontSize: 7.5, rowHeight: ROW_HEIGHT }
         );
-        doc
-          .strokeColor("#dddddd")
-          .moveTo(doc.page.margins.left, doc.y)
-          .lineTo(doc.page.width - doc.page.margins.right, doc.y)
-          .stroke();
-        doc.moveDown(0.3);
       };
 
       const pageLabel = (chunkIndex: number) =>
@@ -134,6 +128,13 @@ export async function generateAttendanceReport(courseId: string, from?: string, 
           const meetsThreshold = pctValue >= settings.attendanceThreshold;
 
           const rowY = doc.y;
+          drawRowGrid(
+            doc,
+            doc.page.margins.left,
+            rowY,
+            [REG_COL_WIDTH, NAME_COL_WIDTH, ...chunk.map(() => DATE_COL_WIDTH), PRESENT_COL_WIDTH, PCT_COL_WIDTH, STATUS_COL_WIDTH],
+            ROW_HEIGHT
+          );
           doc.font("Helvetica").fontSize(8);
           let x = doc.page.margins.left;
           doc.text(student.registrationNumber, x, rowY, { width: REG_COL_WIDTH });
@@ -196,6 +197,8 @@ export async function generateAssessmentReport(assessmentId: string) {
 
   const colWidths = { reg: 70, name: 150, marks: 65, remarks: 85, signature: 95 };
 
+  const HEADER_ROW_HEIGHT = 16;
+
   const drawHeaderRow = (doc: PDFKit.PDFDocument) => {
     drawTableRow(
       doc,
@@ -206,14 +209,8 @@ export async function generateAssessmentReport(assessmentId: string) {
         { text: "Remarks", width: colWidths.remarks },
         { text: "Signature", width: colWidths.signature },
       ],
-      { bold: true }
+      { bold: true, rowHeight: HEADER_ROW_HEIGHT }
     );
-    doc
-      .strokeColor("#dddddd")
-      .moveTo(doc.page.margins.left, doc.y)
-      .lineTo(doc.page.width - doc.page.margins.right, doc.y)
-      .stroke();
-    doc.moveDown(0.3);
   };
 
   const pdf = await bufferPdf((doc) => {
@@ -233,13 +230,17 @@ export async function generateAssessmentReport(assessmentId: string) {
         addReportHeader(doc, settings.institutionName, "Assessment Report", subtitle, settings.institutionLogo);
         drawHeaderRow(doc);
       }
-      drawTableRow(doc, [
-        { text: mark.student.registrationNumber, width: colWidths.reg },
-        { text: mark.student.fullName, width: colWidths.name, ellipsis: true },
-        { text: String(mark.marks), width: colWidths.marks, align: "right" },
-        { text: mark.remarks || "-", width: colWidths.remarks, ellipsis: true },
-        { text: "", width: colWidths.signature },
-      ]);
+      drawTableRow(
+        doc,
+        [
+          { text: mark.student.registrationNumber, width: colWidths.reg },
+          { text: mark.student.fullName, width: colWidths.name, ellipsis: true },
+          { text: String(mark.marks), width: colWidths.marks, align: "right" },
+          { text: mark.remarks || "-", width: colWidths.remarks, ellipsis: true },
+          { text: "", width: colWidths.signature },
+        ],
+        { rowHeight: HEADER_ROW_HEIGHT }
+      );
     }
 
     if (marks.length === 0) {
@@ -335,14 +336,8 @@ export async function generateAllAssessmentsReport(courseId: string) {
             { text: "Status", width: STATUS_COL_WIDTH, align: "center" as const },
             { text: "Signature", width: SIGNATURE_COL_WIDTH },
           ],
-          { bold: true, fontSize: 7.5 }
+          { bold: true, fontSize: 7.5, rowHeight: ROW_HEIGHT }
         );
-        doc
-          .strokeColor("#dddddd")
-          .moveTo(doc.page.margins.left, doc.y)
-          .lineTo(doc.page.width - doc.page.margins.right, doc.y)
-          .stroke();
-        doc.moveDown(0.3);
       };
 
       const pageLabel = (chunkIndex: number) =>
@@ -379,6 +374,21 @@ export async function generateAllAssessmentsReport(courseId: string) {
           const passes = pctValue >= settings.assessmentPassMark;
 
           const rowY = doc.y;
+          drawRowGrid(
+            doc,
+            doc.page.margins.left,
+            rowY,
+            [
+              REG_COL_WIDTH,
+              NAME_COL_WIDTH,
+              ...chunk.map(() => ASSESSMENT_COL_WIDTH),
+              PRESENT_COL_WIDTH,
+              PCT_COL_WIDTH,
+              STATUS_COL_WIDTH,
+              SIGNATURE_COL_WIDTH,
+            ],
+            ROW_HEIGHT
+          );
           doc.font("Helvetica").fontSize(8);
           let x = doc.page.margins.left;
           doc.text(student.registrationNumber, x, rowY, { width: REG_COL_WIDTH - 4 });
