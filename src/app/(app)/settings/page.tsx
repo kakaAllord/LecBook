@@ -230,7 +230,7 @@ export default function SettingsPage() {
             A printable guide covering login and every feature of the system, from the dashboard to generating
             reports.
           </p>
-          <a href="/getting-started-guide.pdf" target="_blank" rel="noreferrer">
+          <a href="/api/getting-started-guide" target="_blank" rel="noreferrer">
             <Button variant="outline">
               <Download className="h-4 w-4" /> Download Getting Started Guide
             </Button>

@@ -22,9 +22,7 @@ prisma/
   seed-credentials.ts    Credentials-only seed (used standalone by `npm run db:seed:creds`, and by seed.ts)
   clear.ts               Wipes everything except the User table (used by `npm run db:clear`)
 scripts/
-  generate-getting-started-pdf.ts   Generates public/getting-started-guide.pdf (used by `npm run docs:guide`)
-public/
-  getting-started-guide.pdf         Generated user guide, served statically and linked from Settings
+  generate-getting-started-pdf.ts   Optional offline CLI to write the guide to public/getting-started-guide.pdf (used by `npm run docs:guide`); the app itself serves it dynamically from src/app/api/getting-started-guide
 src/
   app/
     api/                 Route Handlers = REST API (courses, students, attendance, assessments, reports, auth, dashboard)
@@ -110,7 +108,7 @@ npm run start
 | `npm run db:seed:all` | Alias for `npm run db:seed` |
 | `npm run db:studio` | Open Prisma Studio to inspect the database |
 | `npm run db:clear` | **Destructive.** Wipes courses, students, attendance, assessments, marks and settings — leaves only the `User` table (login credentials) intact. Use this to reset a demo/training environment back to a blank slate without losing the login. |
-| `npm run docs:guide` | Regenerates `public/getting-started-guide.pdf` (optionally pass an institution name, e.g. `npm run docs:guide -- "My College"`) |
+| `npm run docs:guide` | Optional: writes a static copy to `public/getting-started-guide.pdf` (optionally pass an institution name, e.g. `npm run docs:guide -- "My College"`). Not used by the app — Settings links to `/api/getting-started-guide`, which generates it live. |
 
 ## Features
 
@@ -123,7 +121,7 @@ npm run start
 - **Reports** — generate a printable PDF for attendance (by course + date range, with per-student attendance %) or for a single assessment (marks, average, highest, lowest), with the institution name in the header.
 - **Settings** — set the Institution Name shown in the sidebar and printed at the top of every PDF report; stored in the database (not an env var), so it's editable from the UI. Also the place to (re)download the Getting Started guide.
 - **Dark mode** — toggle in the sidebar, persisted to `localStorage`.
-- **Getting Started guide** — a generated PDF (`public/getting-started-guide.pdf`, downloadable from the Settings page) walking through every feature from login to reports.
+- **Getting Started guide** — a PDF generated on demand (`/api/getting-started-guide`, downloadable from the Settings page) walking through every feature from login to reports, with the institution name pulled live from Settings.
 
 ## Notes
 
