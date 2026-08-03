@@ -14,12 +14,31 @@ const ASSESSMENT_COL_WIDTH = 55;
 const SIGNATURE_COL_WIDTH = 90;
 const STATUS_COL_WIDTH = 48;
 
-export async function generateAttendanceReport(courseId: string, from?: string, to?: string) {
-  const [course, settings] = await Promise.all([
-    prisma.course.findUnique({ where: { id: courseId } }),
+async function resolveModuleScope(moduleId: string, courseId?: string) {
+  const module_ = await prisma.module.findUnique({ where: { id: moduleId }, include: { courses: true } });
+  if (!module_) throw new ApiError("Module not found", 404);
+
+  if (courseId) {
+    const course = module_.courses.find((c) => c.id === courseId);
+    if (!course) throw new ApiError("Course is not linked to this module", 422);
+    return { module: module_, scopeCourses: [course] };
+  }
+  return { module: module_, scopeCourses: module_.courses };
+}
+
+function courseScopeLabel(scopeCourses: { name: string }[], allCourseCount: number) {
+  if (scopeCourses.length === 1) return scopeCourses[0].name;
+  if (scopeCourses.length === allCourseCount) return "All Courses";
+  return scopeCourses.map((c) => c.name).join(", ");
+}
+
+export async function generateAttendanceReport(moduleId: string, courseId?: string, from?: string, to?: string) {
+  const [{ module: module_, scopeCourses }, settings] = await Promise.all([
+    resolveModuleScope(moduleId, courseId),
     getSettings(),
   ]);
-  if (!course) throw new ApiError("Course not found", 404);
+
+  const scopeCourseIds = scopeCourses.map((c) => c.id);
 
   const dateFilter: { gte?: Date; lte?: Date } = {};
   if (from) dateFilter.gte = dayjs(from).startOf("day").toDate();
@@ -27,12 +46,13 @@ export async function generateAttendanceReport(courseId: string, from?: string, 
 
   const [students, records] = await Promise.all([
     prisma.student.findMany({
-      where: { courseId, status: "ACTIVE" },
+      where: { courseId: { in: scopeCourseIds }, status: "ACTIVE" },
       orderBy: { fullName: "asc" },
     }),
     prisma.attendance.findMany({
       where: {
-        student: { courseId },
+        moduleId,
+        student: { courseId: { in: scopeCourseIds } },
         ...(Object.keys(dateFilter).length ? { date: dateFilter } : {}),
       },
       orderBy: { date: "asc" },
@@ -53,7 +73,7 @@ export async function generateAttendanceReport(courseId: string, from?: string, 
       ? `${dayjs(from).format("DD MMM YYYY")} - ${dayjs(to).format("DD MMM YYYY")}`
       : "All recorded dates";
 
-  const subtitle = `${course.name} · Level ${course.level} · Semester ${course.semester} · ${course.academicYear}\nDate Range: ${rangeLabel}`;
+  const subtitle = `${module_.name}${module_.code ? ` (${module_.code})` : ""} · ${courseScopeLabel(scopeCourses, module_.courses.length)}\nDate Range: ${rangeLabel}`;
 
   const pdf = await bufferPdf(
     (doc) => {
@@ -64,8 +84,8 @@ export async function generateAttendanceReport(courseId: string, from?: string, 
           .fontSize(10)
           .text(
             students.length === 0
-              ? "No active students found for this course."
-              : "No attendance has been recorded for this course yet."
+              ? "No active students found for this scope."
+              : "No attendance has been recorded for this module yet."
           );
         return;
       }
@@ -168,14 +188,14 @@ export async function generateAttendanceReport(courseId: string, from?: string, 
     { layout: "landscape" }
   );
 
-  return { pdf, filename: `attendance-${course.name}-${dayjs().format("YYYYMMDD")}.pdf` };
+  return { pdf, filename: `attendance-${module_.name.replace(/\s+/g, "-")}-${dayjs().format("YYYYMMDD")}.pdf` };
 }
 
 export async function generateAssessmentReport(assessmentId: string) {
   const [assessment, settings] = await Promise.all([
     prisma.assessment.findUnique({
       where: { id: assessmentId },
-      include: { course: true, assessmentType: true },
+      include: { module: true, courses: true },
     }),
     getSettings(),
   ]);
@@ -193,7 +213,8 @@ export async function generateAssessmentReport(assessmentId: string) {
   const highest = total > 0 ? Math.max(...values) : 0;
   const lowest = total > 0 ? Math.min(...values) : 0;
 
-  const subtitle = `${assessment.course.name} · Level ${assessment.course.level} · ${assessment.course.academicYear}\n${assessment.assessmentType.name}: ${assessment.title} · ${dayjs(assessment.date).format("DD MMM YYYY")}`;
+  const courseLabel = assessment.courses.map((c) => c.name).join(", ");
+  const subtitle = `${assessment.module.name} · ${courseLabel}\n${assessment.name} · ${dayjs(assessment.date).format("DD MMM YYYY")}`;
 
   const colWidths = { reg: 70, name: 150, marks: 65, remarks: 85, signature: 95 };
 
@@ -205,7 +226,7 @@ export async function generateAssessmentReport(assessmentId: string) {
       [
         { text: "Reg. No", width: colWidths.reg },
         { text: "Name", width: colWidths.name },
-        { text: `Marks (/${assessment.assessmentType.maxMarks})`, width: colWidths.marks, align: "right" },
+        { text: `Marks (/${assessment.maxMarks})`, width: colWidths.marks, align: "right" },
         { text: "Remarks", width: colWidths.remarks },
         { text: "Signature", width: colWidths.signature },
       ],
@@ -218,7 +239,7 @@ export async function generateAssessmentReport(assessmentId: string) {
 
     doc.font("Helvetica-Bold").fontSize(10);
     doc.text(
-      `Max Marks: ${assessment.assessmentType.maxMarks}    Total Students: ${total}    Average: ${average.toFixed(1)}    Highest: ${highest}    Lowest: ${lowest}`
+      `Max Marks: ${assessment.maxMarks}    Total Students: ${total}    Average: ${average.toFixed(1)}    Highest: ${highest}    Lowest: ${lowest}`
     );
     doc.moveDown(0.8);
 
@@ -256,25 +277,27 @@ export async function generateAssessmentReport(assessmentId: string) {
 
   return {
     pdf,
-    filename: `assessment-${assessment.title.replace(/\s+/g, "-")}-${dayjs().format("YYYYMMDD")}.pdf`,
+    filename: `assessment-${assessment.name.replace(/\s+/g, "-")}-${dayjs().format("YYYYMMDD")}.pdf`,
   };
 }
 
-export async function generateAllAssessmentsReport(courseId: string) {
-  const [course, settings] = await Promise.all([
-    prisma.course.findUnique({ where: { id: courseId } }),
+export async function generateAllAssessmentsReport(moduleId: string, courseId?: string) {
+  const [{ module: module_, scopeCourses }, settings] = await Promise.all([
+    resolveModuleScope(moduleId, courseId),
     getSettings(),
   ]);
-  if (!course) throw new ApiError("Course not found", 404);
+  const scopeCourseIds = scopeCourses.map((c) => c.id);
 
   const [students, assessments] = await Promise.all([
     prisma.student.findMany({
-      where: { courseId, status: "ACTIVE" },
+      where: { courseId: { in: scopeCourseIds }, status: "ACTIVE" },
       orderBy: { fullName: "asc" },
     }),
     prisma.assessment.findMany({
-      where: { courseId },
-      include: { assessmentType: true },
+      where: {
+        moduleId,
+        ...(courseId ? { courses: { some: { id: courseId } } } : {}),
+      },
       orderBy: { date: "asc" },
     }),
   ]);
@@ -290,9 +313,9 @@ export async function generateAllAssessmentsReport(courseId: string) {
     marksByStudent.get(m.studentId)!.set(m.assessmentId, m.marks);
   }
 
-  const totalPossible = assessments.reduce((sum, a) => sum + a.assessmentType.maxMarks, 0);
+  const totalPossible = assessments.reduce((sum, a) => sum + a.maxMarks, 0);
 
-  const subtitle = `${course.name} · Level ${course.level} · Semester ${course.semester} · ${course.academicYear}\nAll Assessments (${assessments.length})`;
+  const subtitle = `${module_.name}${module_.code ? ` (${module_.code})` : ""} · ${courseScopeLabel(scopeCourses, module_.courses.length)}\nAll Assessments (${assessments.length})`;
 
   const pdf = await bufferPdf(
     (doc) => {
@@ -303,8 +326,8 @@ export async function generateAllAssessmentsReport(courseId: string) {
           .fontSize(10)
           .text(
             students.length === 0
-              ? "No active students found for this course."
-              : "No assessments have been recorded for this course yet."
+              ? "No active students found for this scope."
+              : "No assessments have been recorded for this module yet."
           );
         return;
       }
@@ -326,7 +349,7 @@ export async function generateAllAssessmentsReport(courseId: string) {
             { text: "Reg. No", width: REG_COL_WIDTH },
             { text: "Name", width: NAME_COL_WIDTH },
             ...chunk.map((a) => ({
-              text: a.title,
+              text: a.name,
               width: ASSESSMENT_COL_WIDTH,
               align: "right" as const,
               ellipsis: true,
@@ -423,5 +446,5 @@ export async function generateAllAssessmentsReport(courseId: string) {
     { layout: "landscape" }
   );
 
-  return { pdf, filename: `assessments-${course.name}-${dayjs().format("YYYYMMDD")}.pdf` };
+  return { pdf, filename: `assessments-${module_.name.replace(/\s+/g, "-")}-${dayjs().format("YYYYMMDD")}.pdf` };
 }

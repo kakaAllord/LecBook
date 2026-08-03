@@ -1,47 +1,62 @@
 "use client";
 
-import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import { toast } from "sonner";
-import { assessmentSchema, type AssessmentInput } from "@/lib/validators/assessment";
+import { assessmentSchema, type AssessmentInput, type AssessmentFormInput } from "@/lib/validators/assessment";
 import { api, ApiClientError } from "@/lib/api-client";
-import type { Assessment, AssessmentType, Course } from "@/types";
+import type { Assessment, Module, RemainingMarks } from "@/types";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input, Label, FieldError } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { CheckboxGroup } from "@/components/ui/CheckboxGroup";
 import { Button } from "@/components/ui/Button";
 
 export function NewAssessmentDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const [moduleId, setModuleId] = useState("");
 
-  const { data: courses } = useQuery({
-    queryKey: ["courses", "all"],
-    queryFn: () => api.get<Course[]>("/api/courses?all=true"),
+  const { data: modules } = useQuery({
+    queryKey: ["modules", "all"],
+    queryFn: () => api.get<Module[]>("/api/modules?all=true"),
     enabled: open,
   });
-  const { data: types } = useQuery({
-    queryKey: ["assessment-types"],
-    queryFn: () => api.get<AssessmentType[]>("/api/assessment-types"),
-    enabled: open,
+
+  const { data: remaining } = useQuery({
+    queryKey: ["assessments", "remaining-marks", moduleId],
+    queryFn: () => api.get<RemainingMarks>(`/api/assessments/remaining-marks?moduleId=${moduleId}`),
+    enabled: open && Boolean(moduleId),
   });
+
+  const selectedModule = modules?.find((m) => m.id === moduleId);
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
-  } = useForm<AssessmentInput>({ resolver: zodResolver(assessmentSchema) });
+  } = useForm<AssessmentFormInput, unknown, AssessmentInput>({ resolver: zodResolver(assessmentSchema) });
 
   useEffect(() => {
     if (open) {
-      reset({ courseId: "", assessmentTypeId: "", title: "", date: dayjs().format("YYYY-MM-DD") });
+      setModuleId("");
+      reset({ moduleId: "", courseIds: [], name: "", maxMarks: undefined, date: dayjs().format("YYYY-MM-DD") });
     }
   }, [open, reset]);
+
+  const watchedModuleId = watch("moduleId");
+  useEffect(() => {
+    setModuleId(watchedModuleId || "");
+    setValue("courseIds", []);
+  }, [watchedModuleId, setValue]);
 
   const mutation = useMutation({
     mutationFn: (data: AssessmentInput) => api.post<Assessment>("/api/assessments", data),
@@ -60,34 +75,64 @@ export function NewAssessmentDialog({ open, onClose }: { open: boolean; onClose:
     <Dialog open={open} onClose={onClose} title="New Assessment">
       <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
         <div>
-          <Label htmlFor="courseId">Course</Label>
-          <Select id="courseId" error={errors.courseId?.message} {...register("courseId")}>
-            <option value="">Select a course...</option>
-            {courses?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} · {c.level} · {c.semester}
+          <Label htmlFor="moduleId">Module</Label>
+          <Select id="moduleId" error={errors.moduleId?.message} {...register("moduleId")}>
+            <option value="">Select a module...</option>
+            {modules?.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
               </option>
             ))}
           </Select>
-          <FieldError message={errors.courseId?.message} />
+          <FieldError message={errors.moduleId?.message} />
+          {moduleId && remaining && (
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {remaining.remaining} of {remaining.cap} marks remaining for this module ({remaining.used} already
+              allocated)
+            </p>
+          )}
         </div>
+
         <div>
-          <Label htmlFor="assessmentTypeId">Assessment Type</Label>
-          <Select id="assessmentTypeId" error={errors.assessmentTypeId?.message} {...register("assessmentTypeId")}>
-            <option value="">Select a type...</option>
-            {types?.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} (max {t.maxMarks})
-              </option>
-            ))}
-          </Select>
-          <FieldError message={errors.assessmentTypeId?.message} />
+          <Label htmlFor="courseIds">Courses</Label>
+          <Controller
+            control={control}
+            name="courseIds"
+            render={({ field }) => (
+              <CheckboxGroup
+                options={(selectedModule?.courses ?? []).map((c) => ({
+                  id: c.id,
+                  label: `${c.name} · ${c.level} · ${c.semester}`,
+                }))}
+                value={field.value ?? []}
+                onChange={field.onChange}
+              />
+            )}
+          />
+          <FieldError message={errors.courseIds?.message} />
         </div>
+
         <div>
-          <Label htmlFor="title">Title</Label>
-          <Input id="title" placeholder="Quiz 1" error={errors.title?.message} {...register("title")} />
-          <FieldError message={errors.title?.message} />
+          <Label htmlFor="name">Assessment Type / Name</Label>
+          <Input id="name" placeholder="Quiz 1" error={errors.name?.message} {...register("name")} />
+          <FieldError message={errors.name?.message} />
         </div>
+
+        <div>
+          <Label htmlFor="maxMarks">Marks</Label>
+          <Input
+            id="maxMarks"
+            type="number"
+            step="0.5"
+            min={0}
+            max={remaining?.remaining}
+            placeholder="10"
+            error={errors.maxMarks?.message}
+            {...register("maxMarks")}
+          />
+          <FieldError message={errors.maxMarks?.message} />
+        </div>
+
         <div>
           <Label htmlFor="date">Date</Label>
           <Input id="date" type="date" error={errors.date?.message} {...register("date")} />

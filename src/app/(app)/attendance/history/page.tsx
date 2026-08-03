@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { api } from "@/lib/api-client";
-import type { AttendanceHistoryEntry, Course } from "@/types";
+import type { AttendanceHistoryEntry, Module } from "@/types";
 import { Select } from "@/components/ui/Select";
 import { Input, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -15,23 +15,36 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 export default function AttendanceHistoryPage() {
+  const [moduleId, setModuleId] = useState("");
   const [courseId, setCourseId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
-  const { data: courses } = useQuery({
-    queryKey: ["courses", "all"],
-    queryFn: () => api.get<Course[]>("/api/courses?all=true"),
+  const { data: modules } = useQuery({
+    queryKey: ["modules", "all"],
+    queryFn: () => api.get<Module[]>("/api/modules?all=true"),
   });
 
+  const selectedModule = modules?.find((m) => m.id === moduleId);
+
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["attendance-history", courseId, from, to],
-    queryFn: () =>
-      api.get<AttendanceHistoryEntry[]>(
-        `/api/attendance/history?courseId=${courseId}${from ? `&from=${from}` : ""}${to ? `&to=${to}` : ""}`
-      ),
-    enabled: Boolean(courseId),
+    queryKey: ["attendance-history", moduleId, courseId, from, to],
+    queryFn: () => {
+      const params = new URLSearchParams({ moduleId });
+      if (courseId) params.set("courseIds", courseId);
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      return api.get<AttendanceHistoryEntry[]>(`/api/attendance/history?${params.toString()}`);
+    },
+    enabled: Boolean(moduleId),
   });
+
+  const editHref = (date: string) => {
+    const params = new URLSearchParams({ moduleId, date: dayjs(date).format("YYYY-MM-DD") });
+    const courseIds = courseId ? [courseId] : selectedModule?.courses.map((c) => c.id) ?? [];
+    params.set("courseIds", courseIds.join(","));
+    return `/attendance?${params.toString()}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -44,13 +57,31 @@ export default function AttendanceHistoryPage() {
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="sm:w-72">
+        <div className="sm:w-64">
+          <Label htmlFor="module">Module</Label>
+          <Select
+            id="module"
+            value={moduleId}
+            onChange={(e) => {
+              setModuleId(e.target.value);
+              setCourseId("");
+            }}
+          >
+            <option value="">Select a module...</option>
+            {modules?.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div className="sm:w-56">
           <Label htmlFor="course">Course</Label>
-          <Select id="course" value={courseId} onChange={(e) => setCourseId(e.target.value)}>
-            <option value="">Select a course...</option>
-            {courses?.map((c) => (
+          <Select id="course" value={courseId} onChange={(e) => setCourseId(e.target.value)} disabled={!moduleId}>
+            <option value="">All courses</option>
+            {selectedModule?.courses.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name} · {c.level} · {c.semester}
+                {c.name}
               </option>
             ))}
           </Select>
@@ -65,8 +96,8 @@ export default function AttendanceHistoryPage() {
         </div>
       </div>
 
-      {!courseId ? (
-        <EmptyState title="Select a course" description="Choose a course above to view its attendance history." />
+      {!moduleId ? (
+        <EmptyState title="Select a module" description="Choose a module above to view its attendance history." />
       ) : isLoading || isFetching ? (
         <LoadingSpinner />
       ) : !data || data.length === 0 ? (
@@ -93,7 +124,7 @@ export default function AttendanceHistoryPage() {
                 <TD>{entry.total}</TD>
                 <TD>
                   <div className="flex justify-end">
-                    <Link href={`/attendance?courseId=${courseId}&date=${dayjs(entry.date).format("YYYY-MM-DD")}`}>
+                    <Link href={editHref(entry.date)}>
                       <Button variant="ghost" size="sm">
                         <Pencil className="h-4 w-4" /> Edit
                       </Button>

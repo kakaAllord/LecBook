@@ -7,8 +7,9 @@ export async function GET(request: Request) {
   try {
     await requireSession();
     const { searchParams } = new URL(request.url);
+    const moduleId = searchParams.get("moduleId") ?? undefined;
     const courseId = searchParams.get("courseId") ?? undefined;
-    const assessments = await listAssessments(courseId);
+    const assessments = await listAssessments(moduleId, courseId);
     return ok(assessments);
   } catch (error) {
     return handleApiError(error);

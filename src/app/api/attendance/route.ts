@@ -7,12 +7,14 @@ export async function GET(request: Request) {
   try {
     await requireSession();
     const { searchParams } = new URL(request.url);
-    const courseId = searchParams.get("courseId");
+    const moduleId = searchParams.get("moduleId");
+    const courseIdsParam = searchParams.get("courseIds");
     const date = searchParams.get("date");
-    if (!courseId || !date) {
-      return fail("courseId and date are required", 422);
+    if (!moduleId || !courseIdsParam || !date) {
+      return fail("moduleId, courseIds and date are required", 422);
     }
-    const result = await getAttendanceForDate(courseId, date);
+    const courseIds = courseIdsParam.split(",").filter(Boolean);
+    const result = await getAttendanceForDate(moduleId, courseIds, date);
     return ok(result);
   } catch (error) {
     return handleApiError(error);

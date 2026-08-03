@@ -8,7 +8,17 @@ export type Course = {
   semester: string;
   academicYear: string;
   createdAt: string;
+  modules?: Module[];
   _count?: { students: number };
+};
+
+export type Module = {
+  id: string;
+  name: string;
+  code: string | null;
+  createdAt: string;
+  courses: Course[];
+  _count?: { assessments: number };
 };
 
 export type Student = {
@@ -43,7 +53,8 @@ export type AttendanceDayEntry = {
 };
 
 export type AttendanceForDate = {
-  course: Course;
+  module: Module;
+  courseIds: string[];
   date: string;
   students: AttendanceDayEntry[];
 };
@@ -55,25 +66,22 @@ export type AttendanceHistoryEntry = {
   total: number;
 };
 
-export type AssessmentType = {
-  id: string;
-  name: string;
-  maxMarks: number;
-  description: string | null;
-  createdAt: string;
-  _count?: { assessments: number };
-};
-
 export type Assessment = {
   id: string;
-  courseId: string;
-  assessmentTypeId: string;
-  title: string;
+  moduleId: string;
+  name: string;
+  maxMarks: number;
   date: string;
   createdAt: string;
-  course: Course;
-  assessmentType: AssessmentType;
+  module: Module;
+  courses: Course[];
   _count?: { marks: number };
+};
+
+export type RemainingMarks = {
+  cap: number;
+  used: number;
+  remaining: number;
 };
 
 export type AssessmentMarkEntry = {

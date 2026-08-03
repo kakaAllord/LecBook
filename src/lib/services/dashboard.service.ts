@@ -18,7 +18,7 @@ export async function getDashboardSummary() {
       prisma.assessment.findMany({
         orderBy: { date: "desc" },
         take: 5,
-        include: { course: true, assessmentType: true },
+        include: { module: true, courses: true },
       }),
     ]);
 

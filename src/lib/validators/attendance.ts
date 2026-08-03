@@ -9,7 +9,7 @@ export const attendanceRecordSchema = z.object({
 });
 
 export const saveAttendanceSchema = z.object({
-  courseId: z.string().min(1, "Course is required"),
+  moduleId: z.string().min(1, "Module is required"),
   date: z.string().min(1, "Date is required"),
   records: z.array(attendanceRecordSchema).min(1, "At least one attendance record is required"),
 });

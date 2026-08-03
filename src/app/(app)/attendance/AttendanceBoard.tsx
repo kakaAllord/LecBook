@@ -8,10 +8,11 @@ import dayjs from "dayjs";
 import { History, Save, ClipboardCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiClientError } from "@/lib/api-client";
-import type { AttendanceForDate, AttendanceStatus, Course } from "@/types";
+import type { AttendanceForDate, AttendanceStatus, Module } from "@/types";
 import { Select } from "@/components/ui/Select";
 import { Input, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { CheckboxGroup } from "@/components/ui/CheckboxGroup";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
@@ -23,20 +24,28 @@ export function AttendanceBoard() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
-  const [courseId, setCourseId] = useState(searchParams.get("courseId") ?? "");
+  const [moduleId, setModuleId] = useState(searchParams.get("moduleId") ?? "");
+  const [courseIds, setCourseIds] = useState<string[]>(
+    searchParams.get("courseIds")?.split(",").filter(Boolean) ?? []
+  );
   const [date, setDate] = useState(searchParams.get("date") ?? dayjs().format("YYYY-MM-DD"));
   const [drafts, setDrafts] = useState<Record<string, DraftRecord>>({});
   const [syncedData, setSyncedData] = useState<AttendanceForDate | null>(null);
 
-  const { data: courses } = useQuery({
-    queryKey: ["courses", "all"],
-    queryFn: () => api.get<Course[]>("/api/courses?all=true"),
+  const { data: modules } = useQuery({
+    queryKey: ["modules", "all"],
+    queryFn: () => api.get<Module[]>("/api/modules?all=true"),
   });
 
+  const selectedModule = modules?.find((m) => m.id === moduleId);
+
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["attendance", courseId, date],
-    queryFn: () => api.get<AttendanceForDate>(`/api/attendance?courseId=${courseId}&date=${date}`),
-    enabled: Boolean(courseId && date),
+    queryKey: ["attendance", moduleId, courseIds, date],
+    queryFn: () =>
+      api.get<AttendanceForDate>(
+        `/api/attendance?moduleId=${moduleId}&courseIds=${courseIds.join(",")}&date=${date}`
+      ),
+    enabled: Boolean(moduleId && courseIds.length > 0 && date),
   });
 
   if (data && data !== syncedData) {
@@ -54,7 +63,7 @@ export function AttendanceBoard() {
   const saveMutation = useMutation({
     mutationFn: () =>
       api.post("/api/attendance", {
-        courseId,
+        moduleId,
         date,
         records: Object.entries(drafts).map(([studentId, d]) => ({
           studentId,
@@ -85,7 +94,9 @@ export function AttendanceBoard() {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Attendance</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Choose a course and date to mark attendance.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Choose a module, the course(s) attending this session, and a date to mark attendance.
+          </p>
         </div>
         <Link href="/attendance/history">
           <Button variant="outline">
@@ -94,17 +105,33 @@ export function AttendanceBoard() {
         </Link>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="sm:w-72">
-          <Label htmlFor="course">Course</Label>
-          <Select id="course" value={courseId} onChange={(e) => setCourseId(e.target.value)}>
-            <option value="">Select a course...</option>
-            {courses?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} · {c.level} · {c.semester}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="sm:w-64">
+          <Label htmlFor="module">Module</Label>
+          <Select
+            id="module"
+            value={moduleId}
+            onChange={(e) => {
+              setModuleId(e.target.value);
+              setCourseIds([]);
+            }}
+          >
+            <option value="">Select a module...</option>
+            {modules?.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
               </option>
             ))}
           </Select>
+        </div>
+        <div className="sm:w-72">
+          <Label htmlFor="courses">Course(s) present this session</Label>
+          <CheckboxGroup
+            options={(selectedModule?.courses ?? []).map((c) => ({ id: c.id, label: `${c.name} · ${c.level} · ${c.semester}` }))}
+            value={courseIds}
+            onChange={setCourseIds}
+            className="sm:max-h-40"
+          />
         </div>
         <div className="sm:w-48">
           <Label htmlFor="date">Date</Label>
@@ -112,12 +139,16 @@ export function AttendanceBoard() {
         </div>
       </div>
 
-      {!courseId ? (
-        <EmptyState icon={ClipboardCheck} title="Select a course" description="Choose a course above to load its students." />
+      {!moduleId || courseIds.length === 0 ? (
+        <EmptyState
+          icon={ClipboardCheck}
+          title="Select a module and course(s)"
+          description="Choose a module above, then the course(s) attending this session, to load its students."
+        />
       ) : isLoading || isFetching ? (
         <LoadingSpinner />
       ) : !data || data.students.length === 0 ? (
-        <EmptyState title="No active students" description="This course has no active students to mark attendance for." />
+        <EmptyState title="No active students" description="The selected course(s) have no active students to mark attendance for." />
       ) : (
         <>
           <div className="flex flex-wrap gap-3 text-xs">

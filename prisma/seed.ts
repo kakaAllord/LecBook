@@ -34,27 +34,42 @@ async function main() {
     { name: "Mechanical Engineering", level: "Level 4", semester: "Semester I", academicYear: "2026" },
     { name: "Computer Science", level: "Level 6", semester: "Semester II", academicYear: "2026" },
   ];
-  const courses = [];
+  const courses: Awaited<ReturnType<typeof prisma.course.create>>[] = [];
   for (const c of courseData) {
     const course = await prisma.course.create({ data: c });
     courses.push(course);
   }
   console.log(`Created ${courses.length} courses`);
 
-  const assessmentTypeData = [
-    { name: "Quiz", maxMarks: 20, description: "Short in-class quiz" },
-    { name: "Test", maxMarks: 30, description: "Written test" },
-    { name: "Assignment", maxMarks: 20, description: "Take-home assignment" },
-    { name: "Practical", maxMarks: 50, description: "Practical/lab exercise" },
-    { name: "Presentation", maxMarks: 20, description: "Oral presentation" },
-    { name: "Project", maxMarks: 100, description: "Term project" },
+  const findCourse = (name: string) => courses.find((c) => c.name === name)!;
+
+  // Modules demonstrate both scenarios: a module scoped to a single course,
+  // and a module shared across several courses that may attend on different days.
+  const moduleData = [
+    { name: "Database Systems", code: "CS201", courseNames: ["Computer Science"] },
+    { name: "Circuit Theory", code: "EE210", courseNames: ["Electrical Engineering"] },
+    { name: "Thermodynamics", code: "ME220", courseNames: ["Mechanical Engineering"] },
+    { name: "Programming Fundamentals", code: "CS101", courseNames: ["Computer Science", "Electrical Engineering"] },
+    {
+      name: "Linear Algebra",
+      code: "MATH101",
+      courseNames: ["Electrical Engineering", "Mechanical Engineering", "Computer Science"],
+    },
   ];
-  const assessmentTypes = [];
-  for (const t of assessmentTypeData) {
-    const type = await prisma.assessmentType.create({ data: t });
-    assessmentTypes.push(type);
+  const modules = [];
+  for (const m of moduleData) {
+    const linkedCourses = m.courseNames.map(findCourse);
+    const module_ = await prisma.module.create({
+      data: {
+        name: m.name,
+        code: m.code,
+        courses: { connect: linkedCourses.map((c) => ({ id: c.id })) },
+      },
+      include: { courses: true },
+    });
+    modules.push(module_);
   }
-  console.log(`Created ${assessmentTypes.length} assessment types`);
+  console.log(`Created ${modules.length} modules`);
 
   let regCounter = 1;
   const students = [];
@@ -79,29 +94,41 @@ async function main() {
   }
   console.log(`Created ${students.length} students`);
 
-  const assessments = [];
-  for (const course of courses) {
-    const typesForCourse = [assessmentTypes[0], assessmentTypes[1], assessmentTypes[2]];
-    let n = 1;
-    for (const type of typesForCourse) {
+  // Assessment types/marks, per module, summing to the 60-mark cap.
+  const assessmentPlan = [
+    { name: "Quiz 1", maxMarks: 10 },
+    { name: "CAT 1", maxMarks: 20 },
+    { name: "Assignment 1", maxMarks: 15 },
+    { name: "Final Project", maxMarks: 15 },
+  ];
+
+  const assessments: { assessment: Awaited<ReturnType<typeof prisma.assessment.create>>; maxMarks: number; courseIds: string[] }[] = [];
+  for (const module_ of modules) {
+    const moduleCourseIds = module_.courses.map((c) => c.id);
+    for (let i = 0; i < assessmentPlan.length; i++) {
+      const plan = assessmentPlan[i];
+      // Alternate between "all courses" and a single course when a module has several,
+      // to exercise both assessment-scope options.
+      const courseIds = moduleCourseIds.length > 1 && i % 2 === 1 ? [moduleCourseIds[0]] : moduleCourseIds;
       const assessment = await prisma.assessment.create({
         data: {
-          courseId: course.id,
-          assessmentTypeId: type.id,
-          title: `${type.name} ${n}`,
+          moduleId: module_.id,
+          name: plan.name,
+          maxMarks: plan.maxMarks,
           date: dayjs().subtract(randomInt(1, 20), "day").startOf("day").toDate(),
+          courses: { connect: courseIds.map((id) => ({ id })) },
         },
       });
-      assessments.push({ assessment, type, course });
-      n++;
+      assessments.push({ assessment, maxMarks: plan.maxMarks, courseIds });
     }
   }
   console.log(`Created ${assessments.length} assessments`);
 
-  for (const { assessment, type, course } of assessments) {
-    const courseStudents = students.filter((s) => s.courseId === course.id);
-    for (const student of courseStudents) {
-      const marks = Math.round(randomInt(Math.floor(type.maxMarks * 0.4), type.maxMarks) * 10) / 10;
+  let markCount = 0;
+  for (const { assessment, maxMarks, courseIds } of assessments) {
+    const scopedStudents = students.filter((s) => courseIds.includes(s.courseId));
+    for (const student of scopedStudents) {
+      const marks = Math.round(randomInt(Math.floor(maxMarks * 0.4), maxMarks) * 10) / 10;
       await prisma.assessmentMark.create({
         data: {
           assessmentId: assessment.id,
@@ -109,30 +136,45 @@ async function main() {
           marks,
         },
       });
+      markCount++;
     }
   }
-  console.log("Created assessment marks");
+  console.log(`Created ${markCount} assessment marks`);
 
   const attendanceStatuses: Array<"PRESENT" | "ABSENT"> = [
     "PRESENT", "PRESENT", "PRESENT", "PRESENT", "ABSENT",
   ];
-  let attendanceCount = 0;
-  for (let d = 0; d < 10; d++) {
-    const date = dayjs().subtract(d, "day").startOf("day").toDate();
-    for (const student of students) {
-      await prisma.attendance.upsert({
-        where: { studentId_date: { studentId: student.id, date } },
-        update: {},
-        create: {
+  const attendanceRecords: { studentId: string; moduleId: string; date: Date; status: "PRESENT" | "ABSENT" }[] = [];
+  for (const module_ of modules) {
+    const moduleCourseIds = module_.courses.map((c) => c.id);
+    for (let d = 0; d < 8; d++) {
+      const date = dayjs().subtract(d, "day").startOf("day").toDate();
+      // Not every linked course necessarily attends the same session/day.
+      const sessionCourseIds =
+        moduleCourseIds.length > 1 ? moduleCourseIds.filter(() => Math.random() > 0.3) : moduleCourseIds;
+      if (sessionCourseIds.length === 0) continue;
+
+      const sessionStudents = students.filter((s) => sessionCourseIds.includes(s.courseId));
+      for (const student of sessionStudents) {
+        attendanceRecords.push({
           studentId: student.id,
+          moduleId: module_.id,
           date,
           status: randomFrom(attendanceStatuses),
-        },
-      });
-      attendanceCount++;
+        });
+      }
     }
   }
-  console.log(`Created ${attendanceCount} attendance records`);
+  // Batched in one round trip (with chunking for very large sets) to avoid
+  // the pooled connection idling out over hundreds of sequential awaits.
+  const CHUNK_SIZE = 500;
+  for (let i = 0; i < attendanceRecords.length; i += CHUNK_SIZE) {
+    await prisma.attendance.createMany({
+      data: attendanceRecords.slice(i, i + CHUNK_SIZE),
+      skipDuplicates: true,
+    });
+  }
+  console.log(`Created ${attendanceRecords.length} attendance records`);
 
   console.log("Seeding complete.");
 }

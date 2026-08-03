@@ -11,24 +11,38 @@ function normalizeDate(date: string) {
   return parsed.startOf("day").toDate();
 }
 
-export async function getAttendanceForDate(courseId: string, date: string) {
-  const day = normalizeDate(date);
+async function getModuleWithCourses(moduleId: string) {
+  const module_ = await prisma.module.findUnique({
+    where: { id: moduleId },
+    include: { courses: true },
+  });
+  if (!module_) throw new ApiError("Module not found", 404);
+  return module_;
+}
 
-  const course = await prisma.course.findUnique({ where: { id: courseId } });
-  if (!course) throw new ApiError("Course not found", 404);
+export async function getAttendanceForDate(moduleId: string, courseIds: string[], date: string) {
+  const day = normalizeDate(date);
+  const module_ = await getModuleWithCourses(moduleId);
+
+  const moduleCourseIds = new Set(module_.courses.map((c) => c.id));
+  const invalidCourses = courseIds.filter((id) => !moduleCourseIds.has(id));
+  if (invalidCourses.length > 0) {
+    throw new ApiError("One or more selected courses are not linked to this module", 422);
+  }
 
   const students = await prisma.student.findMany({
-    where: { courseId, status: "ACTIVE" },
+    where: { courseId: { in: courseIds }, status: "ACTIVE" },
     orderBy: { fullName: "asc" },
   });
 
   const records = await prisma.attendance.findMany({
-    where: { date: day, student: { courseId } },
+    where: { date: day, moduleId, student: { courseId: { in: courseIds } } },
   });
   const byStudent = new Map(records.map((r) => [r.studentId, r]));
 
   return {
-    course,
+    module: module_,
+    courseIds,
     date: day,
     students: students.map((s) => ({
       student: s,
@@ -45,27 +59,27 @@ export async function getAttendanceForDate(courseId: string, date: string) {
 
 export async function saveAttendance(input: SaveAttendanceInput) {
   const day = normalizeDate(input.date);
-
-  const course = await prisma.course.findUnique({ where: { id: input.courseId } });
-  if (!course) throw new ApiError("Course not found", 404);
+  const module_ = await getModuleWithCourses(input.moduleId);
+  const moduleCourseIds = module_.courses.map((c) => c.id);
 
   const studentIds = input.records.map((r) => r.studentId);
   const students = await prisma.student.findMany({
-    where: { id: { in: studentIds }, courseId: input.courseId },
-    select: { id: true },
+    where: { id: { in: studentIds }, courseId: { in: moduleCourseIds } },
+    select: { id: true, courseId: true },
   });
   const validIds = new Set(students.map((s) => s.id));
   const invalid = input.records.filter((r) => !validIds.has(r.studentId));
   if (invalid.length > 0) {
-    throw new ApiError("One or more students do not belong to this course", 422);
+    throw new ApiError("One or more students do not belong to a course linked to this module", 422);
   }
 
   await prisma.$transaction(
     input.records.map((r) =>
       prisma.attendance.upsert({
-        where: { studentId_date: { studentId: r.studentId, date: day } },
+        where: { studentId_moduleId_date: { studentId: r.studentId, moduleId: input.moduleId, date: day } },
         create: {
           studentId: r.studentId,
+          moduleId: input.moduleId,
           date: day,
           status: r.status,
           remarks: r.remarks || null,
@@ -78,16 +92,18 @@ export async function saveAttendance(input: SaveAttendanceInput) {
     )
   );
 
-  return getAttendanceForDate(input.courseId, input.date);
+  const courseIds = Array.from(new Set(students.map((s) => s.courseId)));
+  return getAttendanceForDate(input.moduleId, courseIds, input.date);
 }
 
 export async function getAttendanceHistory(
-  courseId: string,
+  moduleId: string,
+  courseIds: string[] | undefined,
   from?: string,
   to?: string
 ) {
-  const course = await prisma.course.findUnique({ where: { id: courseId } });
-  if (!course) throw new ApiError("Course not found", 404);
+  const module_ = await getModuleWithCourses(moduleId);
+  const scopeCourseIds = courseIds && courseIds.length > 0 ? courseIds : module_.courses.map((c) => c.id);
 
   const dateFilter: { gte?: Date; lte?: Date } = {};
   if (from) dateFilter.gte = normalizeDate(from);
@@ -95,7 +111,8 @@ export async function getAttendanceHistory(
 
   const records = await prisma.attendance.findMany({
     where: {
-      student: { courseId },
+      moduleId,
+      student: { courseId: { in: scopeCourseIds } },
       ...(from || to ? { date: dateFilter } : {}),
     },
     orderBy: { date: "desc" },

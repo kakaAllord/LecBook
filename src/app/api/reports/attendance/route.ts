@@ -8,12 +8,13 @@ export async function GET(request: Request) {
   try {
     await requireSession();
     const { searchParams } = new URL(request.url);
-    const courseId = searchParams.get("courseId");
-    if (!courseId) return fail("courseId is required", 422);
+    const moduleId = searchParams.get("moduleId");
+    if (!moduleId) return fail("moduleId is required", 422);
 
+    const courseId = searchParams.get("courseId") ?? undefined;
     const from = searchParams.get("from") ?? undefined;
     const to = searchParams.get("to") ?? undefined;
-    const { pdf, filename } = await generateAttendanceReport(courseId, from, to);
+    const { pdf, filename } = await generateAttendanceReport(moduleId, courseId, from, to);
 
     return new Response(new Uint8Array(pdf), {
       status: 200,

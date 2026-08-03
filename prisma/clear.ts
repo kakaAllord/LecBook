@@ -8,7 +8,7 @@ async function main() {
   await prisma.assessmentMark.deleteMany({});
   await prisma.attendance.deleteMany({});
   await prisma.assessment.deleteMany({});
-  await prisma.assessmentType.deleteMany({});
+  await prisma.module.deleteMany({});
   await prisma.student.deleteMany({});
   await prisma.course.deleteMany({});
   await prisma.settings.deleteMany({});

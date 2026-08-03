@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   BookOpen,
+  Layers,
   Users,
   ClipboardCheck,
   ListChecks,
@@ -24,6 +25,7 @@ import { ThemeToggle } from "@/components/layout/ThemeToggle";
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/courses", label: "Courses", icon: BookOpen },
+  { href: "/modules", label: "Modules", icon: Layers },
   { href: "/students", label: "Students", icon: Users },
   { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
   { href: "/assessments", label: "Assessments", icon: ListChecks },

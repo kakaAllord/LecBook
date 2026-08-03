@@ -19,17 +19,18 @@ export async function GET(request: Request) {
     await requireSession();
     const { searchParams } = new URL(request.url);
     const assessmentId = searchParams.get("assessmentId");
-    const courseId = searchParams.get("courseId");
+    const moduleId = searchParams.get("moduleId");
+    const courseId = searchParams.get("courseId") ?? undefined;
 
     if (assessmentId) {
       const { pdf, filename } = await generateAssessmentReport(assessmentId);
       return pdfResponse(pdf, filename);
     }
-    if (courseId) {
-      const { pdf, filename } = await generateAllAssessmentsReport(courseId);
+    if (moduleId) {
+      const { pdf, filename } = await generateAllAssessmentsReport(moduleId, courseId);
       return pdfResponse(pdf, filename);
     }
-    return fail("assessmentId or courseId is required", 422);
+    return fail("assessmentId or moduleId is required", 422);
   } catch (error) {
     return handleApiError(error);
   }

@@ -33,6 +33,18 @@ model Course {
   createdAt    DateTime @default(now())
 
   students    Student[]
+  modules     Module[]     @relation("ModuleCourses")
+  assessments Assessment[] @relation("AssessmentCourses")
+}
+
+model Module {
+  id        String   @id @default(cuid())
+  name      String
+  code      String?
+  createdAt DateTime @default(now())
+
+  courses     Course[]     @relation("ModuleCourses")
+  attendance  Attendance[]
   assessments Assessment[]
 }
 
@@ -51,9 +63,9 @@ model Student {
   status             StudentStatus @default(ACTIVE)
   createdAt          DateTime      @default(now())
 
-  course    Course           @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  course     Course           @relation(fields: [courseId], references: [id], onDelete: Restrict)
   attendance Attendance[]
-  marks     AssessmentMark[]
+  marks      AssessmentMark[]
 
   @@index([courseId])
 }
@@ -66,40 +78,33 @@ enum AttendanceStatus {
 model Attendance {
   id        String           @id @default(cuid())
   studentId String
+  moduleId  String
   date      DateTime
   status    AttendanceStatus
   remarks   String?
   createdAt DateTime         @default(now())
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  module  Module  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
-  @@unique([studentId, date])
+  @@unique([studentId, moduleId, date])
   @@index([date])
-}
-
-model AssessmentType {
-  id          String  @id @default(cuid())
-  name        String  @unique
-  maxMarks    Float
-  description String?
-  createdAt   DateTime @default(now())
-
-  assessments Assessment[]
+  @@index([moduleId])
 }
 
 model Assessment {
-  id               String   @id @default(cuid())
-  courseId         String
-  assessmentTypeId String
-  title            String
-  date             DateTime
-  createdAt        DateTime @default(now())
+  id        String   @id @default(cuid())
+  moduleId  String
+  name      String
+  maxMarks  Float
+  date      DateTime
+  createdAt DateTime @default(now())
 
-  course         Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  assessmentType AssessmentType   @relation(fields: [assessmentTypeId], references: [id], onDelete: Restrict)
-  marks          AssessmentMark[]
+  module  Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  courses Course[]         @relation("AssessmentCourses")
+  marks   AssessmentMark[]
 
-  @@index([courseId])
+  @@index([moduleId])
 }
 
 model AssessmentMark {

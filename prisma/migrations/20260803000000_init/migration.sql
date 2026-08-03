@@ -1,3 +1,6 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
 CREATE TYPE "StudentStatus" AS ENUM ('ACTIVE', 'INACTIVE');
 
@@ -40,6 +43,16 @@ CREATE TABLE "Course" (
 );
 
 -- CreateTable
+CREATE TABLE "Module" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "code" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Module_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Student" (
     "id" TEXT NOT NULL,
     "registrationNumber" TEXT NOT NULL,
@@ -57,6 +70,7 @@ CREATE TABLE "Student" (
 CREATE TABLE "Attendance" (
     "id" TEXT NOT NULL,
     "studentId" TEXT NOT NULL,
+    "moduleId" TEXT NOT NULL,
     "date" TIMESTAMP(3) NOT NULL,
     "status" "AttendanceStatus" NOT NULL,
     "remarks" TEXT,
@@ -66,22 +80,11 @@ CREATE TABLE "Attendance" (
 );
 
 -- CreateTable
-CREATE TABLE "AssessmentType" (
-    "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "maxMarks" DOUBLE PRECISION NOT NULL,
-    "description" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "AssessmentType_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "Assessment" (
     "id" TEXT NOT NULL,
-    "courseId" TEXT NOT NULL,
-    "assessmentTypeId" TEXT NOT NULL,
-    "title" TEXT NOT NULL,
+    "moduleId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "maxMarks" DOUBLE PRECISION NOT NULL,
     "date" TIMESTAMP(3) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -99,6 +102,22 @@ CREATE TABLE "AssessmentMark" (
     CONSTRAINT "AssessmentMark_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "_ModuleCourses" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+
+    CONSTRAINT "_ModuleCourses_AB_pkey" PRIMARY KEY ("A","B")
+);
+
+-- CreateTable
+CREATE TABLE "_AssessmentCourses" (
+    "A" TEXT NOT NULL,
+    "B" TEXT NOT NULL,
+
+    CONSTRAINT "_AssessmentCourses_AB_pkey" PRIMARY KEY ("A","B")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
@@ -112,16 +131,22 @@ CREATE INDEX "Student_courseId_idx" ON "Student"("courseId");
 CREATE INDEX "Attendance_date_idx" ON "Attendance"("date");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Attendance_studentId_date_key" ON "Attendance"("studentId", "date");
+CREATE INDEX "Attendance_moduleId_idx" ON "Attendance"("moduleId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "AssessmentType_name_key" ON "AssessmentType"("name");
+CREATE UNIQUE INDEX "Attendance_studentId_moduleId_date_key" ON "Attendance"("studentId", "moduleId", "date");
 
 -- CreateIndex
-CREATE INDEX "Assessment_courseId_idx" ON "Assessment"("courseId");
+CREATE INDEX "Assessment_moduleId_idx" ON "Assessment"("moduleId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "AssessmentMark_assessmentId_studentId_key" ON "AssessmentMark"("assessmentId", "studentId");
+
+-- CreateIndex
+CREATE INDEX "_ModuleCourses_B_index" ON "_ModuleCourses"("B");
+
+-- CreateIndex
+CREATE INDEX "_AssessmentCourses_B_index" ON "_AssessmentCourses"("B");
 
 -- AddForeignKey
 ALTER TABLE "Student" ADD CONSTRAINT "Student_courseId_fkey" FOREIGN KEY ("courseId") REFERENCES "Course"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -130,13 +155,26 @@ ALTER TABLE "Student" ADD CONSTRAINT "Student_courseId_fkey" FOREIGN KEY ("cours
 ALTER TABLE "Attendance" ADD CONSTRAINT "Attendance_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Assessment" ADD CONSTRAINT "Assessment_courseId_fkey" FOREIGN KEY ("courseId") REFERENCES "Course"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "Attendance" ADD CONSTRAINT "Attendance_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "Module"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Assessment" ADD CONSTRAINT "Assessment_assessmentTypeId_fkey" FOREIGN KEY ("assessmentTypeId") REFERENCES "AssessmentType"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Assessment" ADD CONSTRAINT "Assessment_moduleId_fkey" FOREIGN KEY ("moduleId") REFERENCES "Module"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "AssessmentMark" ADD CONSTRAINT "AssessmentMark_assessmentId_fkey" FOREIGN KEY ("assessmentId") REFERENCES "Assessment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "AssessmentMark" ADD CONSTRAINT "AssessmentMark_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "Student"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_ModuleCourses" ADD CONSTRAINT "_ModuleCourses_A_fkey" FOREIGN KEY ("A") REFERENCES "Course"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_ModuleCourses" ADD CONSTRAINT "_ModuleCourses_B_fkey" FOREIGN KEY ("B") REFERENCES "Module"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_AssessmentCourses" ADD CONSTRAINT "_AssessmentCourses_A_fkey" FOREIGN KEY ("A") REFERENCES "Assessment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "_AssessmentCourses" ADD CONSTRAINT "_AssessmentCourses_B_fkey" FOREIGN KEY ("B") REFERENCES "Course"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

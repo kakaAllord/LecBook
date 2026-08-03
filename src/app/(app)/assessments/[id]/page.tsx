@@ -45,7 +45,7 @@ export default function AssessmentDetailPage() {
     setDrafts(next);
   }
 
-  const maxMarks = data?.assessment.assessmentType.maxMarks ?? 0;
+  const maxMarks = data?.assessment.maxMarks ?? 0;
 
   const stats = useMemo(() => {
     const values = Object.values(drafts)
@@ -121,9 +121,9 @@ export default function AssessmentDetailPage() {
         </Link>
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{data.assessment.title}</h1>
+            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{data.assessment.name}</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              {data.assessment.assessmentType.name} · {data.assessment.course.name} ·{" "}
+              {data.assessment.module.name} · {data.assessment.courses.map((c) => c.name).join(", ")} ·{" "}
               {dayjs(data.assessment.date).format("DD MMM YYYY")} · Max {maxMarks} marks
             </p>
           </div>
@@ -159,7 +159,7 @@ export default function AssessmentDetailPage() {
       )}
 
       {data.students.length === 0 ? (
-        <EmptyState title="No active students" description="This course has no active students to record marks for." />
+        <EmptyState title="No active students" description="These courses have no active students to record marks for." />
       ) : (
         <>
           <Table>
