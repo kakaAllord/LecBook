@@ -64,20 +64,29 @@ JWT_SECRET="change-me-to-a-long-random-string"
 
 ```bash
 npm run db:migrate   # applies prisma/migrations and generates the Prisma client
-npm run db:seed      # optional: seeds a lecturer account + sample demo data
+npm run db:seed      # optional: seeds the three account tiers + sample demo data
 ```
 
 Two narrower seed options are also available:
 
-- `npm run db:seed:creds` — seeds (or updates) only the lecturer login, no demo data. Useful for a real/production database.
+- `npm run db:seed:creds` — seeds (or updates) only the logins, no demo data. Useful for a real/production database.
 - `npm run db:seed:all` — same as `npm run db:seed` (full demo data), named explicitly for symmetry with `db:seed:creds`.
 
-By default the seeded lecturer login is:
+The seed creates one account per role: a **super admin** (the developer/operator),
+an **administrator** (who registers students and adds lecturers), and a
+**lecturer**.
 
-- **Email:** `lecturer@example.com`
-- **Password:** `REDACTED_SEED_PASSWORD`
+Credentials are never hardcoded in the repository. Set them before seeding with
+the `SEED_SUPERADMIN_*`, `SEED_ADMIN_*` and `SEED_LECTURER_*` variables in `.env`
+— see `.env.example` for the full list. **Leave a password unset and the seed
+generates a random one and prints it once**, so a fresh clone never inherits a
+password that is public in git history.
 
-Override these before seeding by setting `SEED_LECTURER_EMAIL`, `SEED_LECTURER_PASSWORD`, and `SEED_LECTURER_NAME` env vars — recommended for any database that isn't a local throwaway. There is no in-app way to change credentials afterward by design — re-run `db:seed:creds` (with new env vars) or update the `User` row directly if needed.
+Your own local logins are recorded in `CREDENTIALS.local.md`, which is untracked.
+
+There is no in-app way to change credentials by design — re-run `db:seed:creds`
+after editing `.env`, or have the person reset their own password through an
+invite link.
 
 ### 4. Run the app
 
