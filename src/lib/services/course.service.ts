@@ -1,19 +1,37 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { paginatedResult } from "@/lib/pagination";
 import type { CourseInput, CourseUpdateInput } from "@/lib/validators/course";
 import { ApiError } from "@/lib/api-response";
 
-export async function listCourses(search: string, page: number, pageSize: number) {
-  const where = search
-    ? {
-        OR: [
-          { name: { contains: search } },
-          { level: { contains: search } },
-          { semester: { contains: search } },
-          { academicYear: { contains: search } },
-        ],
-      }
-    : {};
+/** `scopeIds` of null means "no restriction" (admins); an array restricts to a lecturer's courses. */
+function scopeWhere(scopeIds: string[] | null): Prisma.CourseWhereInput {
+  return scopeIds === null ? {} : { id: { in: scopeIds } };
+}
+
+export async function listCourses(
+  search: string,
+  page: number,
+  pageSize: number,
+  scopeIds: string[] | null = null
+) {
+  const where: Prisma.CourseWhereInput = {
+    AND: [
+      scopeWhere(scopeIds),
+      ...(search
+        ? [
+            {
+              OR: [
+                { name: { contains: search, mode: "insensitive" as const } },
+                { level: { contains: search, mode: "insensitive" as const } },
+                { semester: { contains: search, mode: "insensitive" as const } },
+                { academicYear: { contains: search, mode: "insensitive" as const } },
+              ],
+            },
+          ]
+        : []),
+    ],
+  };
 
   const [items, total] = await Promise.all([
     prisma.course.findMany({
@@ -21,7 +39,7 @@ export async function listCourses(search: string, page: number, pageSize: number
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      include: { _count: { select: { students: true } } },
+      include: { _count: { select: { students: true } }, lecturers: { select: { id: true, name: true } } },
     }),
     prisma.course.count({ where }),
   ]);
@@ -29,8 +47,8 @@ export async function listCourses(search: string, page: number, pageSize: number
   return paginatedResult(items, total, page, pageSize);
 }
 
-export async function listAllCourses() {
-  return prisma.course.findMany({ orderBy: { name: "asc" } });
+export async function listAllCourses(scopeIds: string[] | null = null) {
+  return prisma.course.findMany({ where: scopeWhere(scopeIds), orderBy: { name: "asc" } });
 }
 
 export async function getCourse(id: string) {

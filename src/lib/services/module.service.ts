@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { paginatedResult } from "@/lib/pagination";
 import type { ModuleInput, ModuleUpdateInput } from "@/lib/validators/module";
@@ -10,12 +11,27 @@ async function assertCoursesExist(courseIds: string[]) {
   }
 }
 
-export async function listModules(search: string, page: number, pageSize: number) {
-  const where = search
-    ? {
-        OR: [{ name: { contains: search } }, { code: { contains: search } }],
-      }
-    : {};
+export async function listModules(
+  search: string,
+  page: number,
+  pageSize: number,
+  scopeIds: string[] | null = null
+) {
+  const where: Prisma.ModuleWhereInput = {
+    AND: [
+      scopeIds === null ? {} : { id: { in: scopeIds } },
+      ...(search
+        ? [
+            {
+              OR: [
+                { name: { contains: search, mode: "insensitive" as const } },
+                { code: { contains: search, mode: "insensitive" as const } },
+              ],
+            },
+          ]
+        : []),
+    ],
+  };
 
   const [items, total] = await Promise.all([
     prisma.module.findMany({
@@ -31,8 +47,9 @@ export async function listModules(search: string, page: number, pageSize: number
   return paginatedResult(items, total, page, pageSize);
 }
 
-export async function listAllModules() {
+export async function listAllModules(scopeIds: string[] | null = null) {
   return prisma.module.findMany({
+    where: scopeIds === null ? {} : { id: { in: scopeIds } },
     orderBy: { name: "asc" },
     include: { courses: true },
   });

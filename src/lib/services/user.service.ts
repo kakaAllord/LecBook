@@ -128,13 +128,16 @@ export async function createUser(session: Session, data: CreateUserInput) {
     throw new ApiError("An account with this email already exists", 409);
   }
 
-  if (data.courseIds.length > 0) {
-    const count = await prisma.course.count({ where: { id: { in: data.courseIds } } });
-    if (count !== data.courseIds.length) throw new ApiError("One or more courses do not exist", 422);
+  const courseIds = data.courseIds ?? [];
+  const moduleIds = data.moduleIds ?? [];
+
+  if (courseIds.length > 0) {
+    const count = await prisma.course.count({ where: { id: { in: courseIds } } });
+    if (count !== courseIds.length) throw new ApiError("One or more courses do not exist", 422);
   }
-  if (data.moduleIds.length > 0) {
-    const count = await prisma.module.count({ where: { id: { in: data.moduleIds } } });
-    if (count !== data.moduleIds.length) throw new ApiError("One or more modules do not exist", 422);
+  if (moduleIds.length > 0) {
+    const count = await prisma.module.count({ where: { id: { in: moduleIds } } });
+    if (count !== moduleIds.length) throw new ApiError("One or more modules do not exist", 422);
   }
 
   const token = generateInviteToken();
@@ -149,8 +152,8 @@ export async function createUser(session: Session, data: CreateUserInput) {
       phone: data.phone || null,
       staffId: data.staffId || null,
       createdById: session.sub,
-      courses: { connect: data.courseIds.map((id) => ({ id })) },
-      modules: { connect: data.moduleIds.map((id) => ({ id })) },
+      courses: { connect: courseIds.map((id) => ({ id })) },
+      modules: { connect: moduleIds.map((id) => ({ id })) },
       invites: {
         create: {
           token,

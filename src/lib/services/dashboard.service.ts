@@ -1,21 +1,40 @@
 import dayjs from "dayjs";
 import { prisma } from "@/lib/prisma";
 
-export async function getDashboardSummary() {
+/**
+ * Summary for the signed-in account. Admins see the whole institution; a
+ * lecturer sees only their assigned courses, so the same dashboard doubles as
+ * their personal view — which is also exactly what a super admin sees when
+ * viewing as that lecturer.
+ */
+export async function getDashboardSummary(scope: {
+  courseIds: string[] | null;
+  moduleIds: string[] | null;
+}) {
   const todayStart = dayjs().startOf("day").toDate();
+
+  const studentWhere = scope.courseIds === null ? {} : { courseId: { in: scope.courseIds } };
+  const courseWhere = scope.courseIds === null ? {} : { id: { in: scope.courseIds } };
+  const assessmentWhere = scope.moduleIds === null ? {} : { moduleId: { in: scope.moduleIds } };
+  const attendanceWhere = {
+    date: todayStart,
+    ...(scope.moduleIds === null ? {} : { moduleId: { in: scope.moduleIds } }),
+    ...(scope.courseIds === null ? {} : { student: { courseId: { in: scope.courseIds } } }),
+  };
 
   const [totalStudents, activeStudents, totalCourses, totalAssessments, todayAttendance, recentAssessments] =
     await Promise.all([
-      prisma.student.count(),
-      prisma.student.count({ where: { status: "ACTIVE" } }),
-      prisma.course.count(),
-      prisma.assessment.count(),
+      prisma.student.count({ where: studentWhere }),
+      prisma.student.count({ where: { ...studentWhere, status: "ACTIVE" } }),
+      prisma.course.count({ where: courseWhere }),
+      prisma.assessment.count({ where: assessmentWhere }),
       prisma.attendance.groupBy({
         by: ["status"],
-        where: { date: todayStart },
+        where: attendanceWhere,
         _count: true,
       }),
       prisma.assessment.findMany({
+        where: assessmentWhere,
         orderBy: { date: "desc" },
         take: 5,
         include: { module: true, courses: true },

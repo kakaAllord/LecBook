@@ -10,8 +10,10 @@ export const createUserSchema = z.object({
   title: z.string().max(50).optional().or(z.literal("")),
   phone: z.string().max(30).optional().or(z.literal("")),
   staffId: z.string().max(50).optional().or(z.literal("")),
-  courseIds: z.array(z.string()).default([]),
-  moduleIds: z.array(z.string()).default([]),
+  // Optional rather than defaulted so the inferred input and output types match,
+  // which keeps react-hook-form's resolver types happy.
+  courseIds: z.array(z.string()).optional(),
+  moduleIds: z.array(z.string()).optional(),
 });
 
 export const updateUserSchema = createUserSchema.partial().extend({

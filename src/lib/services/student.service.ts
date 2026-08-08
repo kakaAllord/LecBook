@@ -10,18 +10,26 @@ export async function listStudents(opts: {
   status?: string;
   page: number;
   pageSize: number;
+  /** Null for admins; a lecturer's assigned course ids otherwise. */
+  scopeCourseIds?: string[] | null;
 }) {
-  const { search, courseId, status, page, pageSize } = opts;
+  const { search, courseId, status, page, pageSize, scopeCourseIds = null } = opts;
 
   const where: Prisma.StudentWhereInput = {
-    ...(courseId ? { courseId } : {}),
+    ...(scopeCourseIds !== null ? { courseId: { in: scopeCourseIds } } : {}),
+    // An explicit course filter still has to sit inside the caller's scope.
+    ...(courseId
+      ? scopeCourseIds !== null && !scopeCourseIds.includes(courseId)
+        ? { courseId: "__out_of_scope__" }
+        : { courseId }
+      : {}),
     ...(status ? { status: status as "ACTIVE" | "INACTIVE" } : {}),
     ...(search
       ? {
           OR: [
-            { fullName: { contains: search } },
-            { registrationNumber: { contains: search } },
-            { phone: { contains: search } },
+            { fullName: { contains: search, mode: "insensitive" } },
+            { registrationNumber: { contains: search, mode: "insensitive" } },
+            { phone: { contains: search, mode: "insensitive" } },
           ],
         }
       : {}),

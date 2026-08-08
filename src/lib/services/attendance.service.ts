@@ -57,7 +57,7 @@ export async function getAttendanceForDate(moduleId: string, courseIds: string[]
   };
 }
 
-export async function saveAttendance(input: SaveAttendanceInput) {
+export async function saveAttendance(input: SaveAttendanceInput, recordedById?: string) {
   const day = normalizeDate(input.date);
   const module_ = await getModuleWithCourses(input.moduleId);
   const moduleCourseIds = module_.courses.map((c) => c.id);
@@ -83,10 +83,12 @@ export async function saveAttendance(input: SaveAttendanceInput) {
           date: day,
           status: r.status,
           remarks: r.remarks || null,
+          recordedById: recordedById ?? null,
         },
         update: {
           status: r.status,
           remarks: r.remarks || null,
+          recordedById: recordedById ?? null,
         },
       })
     )

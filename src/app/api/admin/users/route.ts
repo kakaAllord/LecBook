@@ -37,7 +37,11 @@ export async function POST(request: Request) {
       entity: "User",
       entityId: user.id,
       summary: `${session.name} added ${data.role === "ADMIN" ? "admin" : "lecturer"} ${user.name} (${user.email})`,
-      metadata: { role: user.role, courses: data.courseIds.length, modules: data.moduleIds.length },
+      metadata: {
+        role: user.role,
+        courses: user.courses.length,
+        modules: user.modules.length,
+      },
     });
 
     return ok({ user, inviteUrl: buildInviteUrl(request, token) }, 201);
