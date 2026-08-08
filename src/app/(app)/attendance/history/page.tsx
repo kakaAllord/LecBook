@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { ArrowLeft, Pencil } from "lucide-react";
-import { api } from "@/lib/api-client";
+import { ArrowLeft, Pencil, Wrench, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { api, ApiClientError } from "@/lib/api-client";
 import type { AttendanceHistoryEntry, Module } from "@/types";
 import { Select } from "@/components/ui/Select";
 import { Input, Label } from "@/components/ui/Input";
@@ -13,12 +14,17 @@ import { Button } from "@/components/ui/Button";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { FixSessionDialog, type SessionRef } from "./FixSessionDialog";
 
 export default function AttendanceHistoryPage() {
+  const queryClient = useQueryClient();
   const [moduleId, setModuleId] = useState("");
   const [courseId, setCourseId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [fixing, setFixing] = useState<SessionRef | null>(null);
+  const [deleting, setDeleting] = useState<SessionRef | null>(null);
 
   const { data: modules } = useQuery({
     queryKey: ["modules", "all"],
@@ -39,12 +45,39 @@ export default function AttendanceHistoryPage() {
     enabled: Boolean(moduleId),
   });
 
+  const scopedCourseIds = courseId ? [courseId] : selectedModule?.courses.map((c) => c.id) ?? [];
+
   const editHref = (date: string) => {
     const params = new URLSearchParams({ moduleId, date: dayjs(date).format("YYYY-MM-DD") });
-    const courseIds = courseId ? [courseId] : selectedModule?.courses.map((c) => c.id) ?? [];
-    params.set("courseIds", courseIds.join(","));
+    params.set("courseIds", scopedCourseIds.join(","));
     return `/attendance?${params.toString()}`;
   };
+
+  const sessionRef = (entry: AttendanceHistoryEntry): SessionRef => ({
+    moduleId,
+    moduleName: selectedModule?.name ?? "this module",
+    date: entry.date,
+    courseIds: scopedCourseIds,
+    total: entry.total,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (target: SessionRef) =>
+      api.delete<{ deleted: number }>("/api/attendance/session", {
+        moduleId: target.moduleId,
+        date: target.date,
+        courseIds: target.courseIds,
+      }),
+    onSuccess: ({ deleted }) => {
+      toast.success(`Deleted ${deleted} attendance record${deleted === 1 ? "" : "s"}`);
+      queryClient.invalidateQueries({ queryKey: ["attendance-history"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      setDeleting(null);
+    },
+    onError: (error) => {
+      toast.error(error instanceof ApiClientError ? error.message : "Could not delete this session");
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -53,7 +86,10 @@ export default function AttendanceHistoryPage() {
           <ArrowLeft className="h-3.5 w-3.5" /> Back to Attendance
         </Link>
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Attendance History</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Review and edit past attendance records.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Review past sessions, correct individual marks, or fix a whole session saved against the
+          wrong module, date or courses.
+        </p>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -123,12 +159,28 @@ export default function AttendanceHistoryPage() {
                 <TD>{entry.absent}</TD>
                 <TD>{entry.total}</TD>
                 <TD>
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-1">
                     <Link href={editHref(entry.date)}>
-                      <Button variant="ghost" size="sm">
-                        <Pencil className="h-4 w-4" /> Edit
+                      <Button variant="ghost" size="sm" title="Change who was present or absent">
+                        <Pencil className="h-4 w-4" /> Marks
                       </Button>
                     </Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Wrong module, date or courses"
+                      onClick={() => setFixing(sessionRef(entry))}
+                    >
+                      <Wrench className="h-4 w-4 text-amber-500" /> Fix
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Delete this whole session"
+                      onClick={() => setDeleting(sessionRef(entry))}
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
                   </div>
                 </TD>
               </TR>
@@ -136,6 +188,22 @@ export default function AttendanceHistoryPage() {
           </TBody>
         </Table>
       )}
+
+      <FixSessionDialog
+        open={Boolean(fixing)}
+        onClose={() => setFixing(null)}
+        session={fixing}
+        modules={modules ?? []}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => deleting && deleteMutation.mutate(deleting)}
+        loading={deleteMutation.isPending}
+        title="Delete this session?"
+        description={`This permanently removes all ${deleting?.total ?? 0} attendance records saved for ${deleting?.moduleName} on ${deleting ? dayjs(deleting.date).format("DD MMM YYYY") : ""}.`}
+      />
     </div>
   );
 }

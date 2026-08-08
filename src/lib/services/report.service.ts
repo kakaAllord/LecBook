@@ -91,7 +91,13 @@ export async function generateAttendanceReport(moduleId: string, courseId?: stri
       }
 
       const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-      const fixedWidth = REG_COL_WIDTH + NAME_COL_WIDTH + PRESENT_COL_WIDTH + PCT_COL_WIDTH + STATUS_COL_WIDTH;
+      const fixedWidth =
+        REG_COL_WIDTH +
+        NAME_COL_WIDTH +
+        PRESENT_COL_WIDTH +
+        PCT_COL_WIDTH +
+        STATUS_COL_WIDTH +
+        SIGNATURE_COL_WIDTH;
       const datesPerChunk = Math.max(1, Math.floor((usableWidth - fixedWidth) / DATE_COL_WIDTH));
 
       const chunks: string[][] = [];
@@ -109,6 +115,7 @@ export async function generateAttendanceReport(moduleId: string, courseId?: stri
             { text: "Pres.", width: PRESENT_COL_WIDTH, align: "right" as const },
             { text: "Att %", width: PCT_COL_WIDTH, align: "right" as const },
             { text: "Status", width: STATUS_COL_WIDTH, align: "center" as const },
+            { text: "Signature", width: SIGNATURE_COL_WIDTH },
           ],
           { bold: true, fontSize: 7.5, rowHeight: ROW_HEIGHT }
         );
@@ -152,7 +159,15 @@ export async function generateAttendanceReport(moduleId: string, courseId?: stri
             doc,
             doc.page.margins.left,
             rowY,
-            [REG_COL_WIDTH, NAME_COL_WIDTH, ...chunk.map(() => DATE_COL_WIDTH), PRESENT_COL_WIDTH, PCT_COL_WIDTH, STATUS_COL_WIDTH],
+            [
+              REG_COL_WIDTH,
+              NAME_COL_WIDTH,
+              ...chunk.map(() => DATE_COL_WIDTH),
+              PRESENT_COL_WIDTH,
+              PCT_COL_WIDTH,
+              STATUS_COL_WIDTH,
+              SIGNATURE_COL_WIDTH,
+            ],
             ROW_HEIGHT
           );
           doc.font("Helvetica").fontSize(8);
@@ -174,6 +189,7 @@ export async function generateAttendanceReport(moduleId: string, courseId?: stri
           doc.text(`${pct}%`, x, rowY, { width: PCT_COL_WIDTH, align: "right" });
           x += PCT_COL_WIDTH;
           drawStatusCell(doc, x, rowY, STATUS_COL_WIDTH, ROW_HEIGHT, meetsThreshold ? "OK" : "LOW", meetsThreshold);
+          // Signature column intentionally left blank for physical sign-off.
 
           doc.y = rowY + ROW_HEIGHT;
         }
