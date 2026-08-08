@@ -1,14 +1,14 @@
-import dayjs from "dayjs";
 import { prisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api-response";
+import { toUtcDayStart } from "@/lib/date";
 import type { SaveAttendanceInput } from "@/lib/validators/attendance";
 
 function normalizeDate(date: string) {
-  const parsed = dayjs(date);
-  if (!parsed.isValid()) {
+  const day = toUtcDayStart(date);
+  if (!day) {
     throw new ApiError("Invalid date", 422);
   }
-  return parsed.startOf("day").toDate();
+  return day;
 }
 
 async function getModuleWithCourses(moduleId: string) {

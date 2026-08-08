@@ -2,6 +2,7 @@ import dayjs from "dayjs";
 import { prisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api-response";
 import { bufferPdf, addReportHeader, drawTableRow, drawTick, drawStatusCell, drawRowGrid } from "@/lib/pdf";
+import { toUtcDayStart, toUtcDayEnd } from "@/lib/date";
 import { getSettings } from "@/lib/services/settings.service";
 
 const REG_COL_WIDTH = 65;
@@ -41,8 +42,10 @@ export async function generateAttendanceReport(moduleId: string, courseId?: stri
   const scopeCourseIds = scopeCourses.map((c) => c.id);
 
   const dateFilter: { gte?: Date; lte?: Date } = {};
-  if (from) dateFilter.gte = dayjs(from).startOf("day").toDate();
-  if (to) dateFilter.lte = dayjs(to).endOf("day").toDate();
+  const fromDay = from ? toUtcDayStart(from) : null;
+  const toDay = to ? toUtcDayEnd(to) : null;
+  if (fromDay) dateFilter.gte = fromDay;
+  if (toDay) dateFilter.lte = toDay;
 
   const [students, records] = await Promise.all([
     prisma.student.findMany({

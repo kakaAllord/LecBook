@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api-response";
 import { bufferPdf, addReportHeader, drawTableRow } from "@/lib/pdf";
 import { getSettings } from "@/lib/services/settings.service";
+import { toUtcDayStart, toUtcDayEnd } from "@/lib/date";
 import type { StudentExportInput } from "@/lib/validators/export";
 
 export type StudentExportData = {
@@ -45,7 +46,14 @@ export type StudentExportData = {
       possible: number;
       percentage: number;
     }[];
-    overall: { obtained: number; possible: number; percentage: number; passes: boolean };
+    overall: {
+      obtained: number;
+      possible: number;
+      percentage: number;
+      passes: boolean;
+      /** False when nothing has been marked, so no verdict is shown. */
+      graded: boolean;
+    };
   };
   thresholds: { attendance: number; passMark: number };
 };
@@ -71,8 +79,8 @@ export async function buildStudentExport(
   const attendanceModuleIds = options.attendanceModuleIds ?? [];
   const assessmentModuleIds = options.assessmentModuleIds ?? [];
 
-  const from = options.attendanceFrom ? dayjs(options.attendanceFrom).startOf("day").toDate() : undefined;
-  const to = options.attendanceTo ? dayjs(options.attendanceTo).endOf("day").toDate() : undefined;
+  const from = options.attendanceFrom ? toUtcDayStart(options.attendanceFrom) ?? undefined : undefined;
+  const to = options.attendanceTo ? toUtcDayEnd(options.attendanceTo) ?? undefined : undefined;
 
   const data: StudentExportData = {
     generatedAt: dayjs().format("DD MMM YYYY, HH:mm"),
@@ -198,7 +206,15 @@ export async function buildStudentExport(
     const percentage = pct(obtained, possible);
     data.assessments = {
       modules,
-      overall: { obtained, possible, percentage, passes: percentage >= settings.assessmentPassMark },
+      overall: {
+        obtained,
+        possible,
+        percentage,
+        // With nothing marked there is no verdict to give — calling a student
+        // with zero assessments a "REDO" reads as a failing grade they never sat.
+        passes: possible > 0 && percentage >= settings.assessmentPassMark,
+        graded: possible > 0,
+      },
     };
   }
 
@@ -258,7 +274,9 @@ export function renderStudentExportText(data: StudentExportData, options: Studen
     if (data.assessments.modules.length === 0) lines.push("  No assessments recorded for this selection.");
     lines.push(
       "",
-      `  OVERALL: ${data.assessments.overall.obtained}/${data.assessments.overall.possible} (${data.assessments.overall.percentage}%) — ${data.assessments.overall.passes ? "PASS" : "REDO"}`,
+      data.assessments.overall.graded
+        ? `  OVERALL: ${data.assessments.overall.obtained}/${data.assessments.overall.possible} (${data.assessments.overall.percentage}%) — ${data.assessments.overall.passes ? "PASS" : "REDO"}`
+        : "  OVERALL: nothing marked yet",
       ""
     );
   }
@@ -272,7 +290,9 @@ export function renderStudentExportText(data: StudentExportData, options: Studen
     }
     if (data.assessments) {
       lines.push(
-        `  Assessment ${data.assessments.overall.percentage}% (pass mark ${data.thresholds.passMark}%)`
+        data.assessments.overall.graded
+          ? `  Assessment ${data.assessments.overall.percentage}% (pass mark ${data.thresholds.passMark}%)`
+          : "  Assessment: none marked for this selection"
       );
     }
     lines.push("");
@@ -424,7 +444,9 @@ export async function renderStudentExportPdf(data: StudentExportData, options: S
               align: "right",
             },
             {
-              text: `${data.assessments.overall.percentage}% · ${data.assessments.overall.passes ? "PASS" : "REDO"}`,
+              text: data.assessments.overall.graded
+                ? `${data.assessments.overall.percentage}% · ${data.assessments.overall.passes ? "PASS" : "REDO"}`
+                : "nothing marked yet",
               width: 145,
               align: "right",
             },
@@ -445,7 +467,9 @@ export async function renderStudentExportPdf(data: StudentExportData, options: S
       }
       if (data.assessments) {
         doc.text(
-          `Assessments: ${data.assessments.overall.percentage}% against a ${data.thresholds.passMark}% pass mark.`
+          data.assessments.overall.graded
+            ? `Assessments: ${data.assessments.overall.percentage}% against a ${data.thresholds.passMark}% pass mark.`
+            : "Assessments: none marked for this selection."
         );
       }
       doc.moveDown(0.5);

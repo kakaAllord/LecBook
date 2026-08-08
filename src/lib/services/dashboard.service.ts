@@ -1,5 +1,5 @@
-import dayjs from "dayjs";
 import { prisma } from "@/lib/prisma";
+import { todayUtcDayStart } from "@/lib/date";
 
 /**
  * Summary for the signed-in account. Admins see the whole institution; a
@@ -11,7 +11,8 @@ export async function getDashboardSummary(scope: {
   courseIds: string[] | null;
   moduleIds: string[] | null;
 }) {
-  const todayStart = dayjs().startOf("day").toDate();
+  // Attendance is keyed by midnight UTC, so "today" must be resolved the same way.
+  const todayStart = todayUtcDayStart();
 
   const studentWhere = scope.courseIds === null ? {} : { courseId: { in: scope.courseIds } };
   const courseWhere = scope.courseIds === null ? {} : { id: { in: scope.courseIds } };
