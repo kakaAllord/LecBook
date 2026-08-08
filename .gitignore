@@ -47,3 +47,6 @@ next-env.d.ts
 /src/generated/
 
 /src/generated/prisma
+
+# Generated documents
+LecBook-Business-Proposal-*.pdf

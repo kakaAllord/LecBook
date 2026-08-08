@@ -2,10 +2,17 @@ import PDFDocument from "pdfkit";
 
 export function bufferPdf(
   build: (doc: PDFKit.PDFDocument) => void,
-  options: { layout?: "portrait" | "landscape" } = {}
+  options: { layout?: "portrait" | "landscape"; margin?: number } = {}
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: "A4", margin: 40, layout: options.layout ?? "portrait", bufferPages: true });
+    const doc = new PDFDocument({
+      size: "A4",
+      // Set here rather than mutated later: pdfkit applies the document margin
+      // to every page it creates, so a per-page override does not carry.
+      margin: options.margin ?? 40,
+      layout: options.layout ?? "portrait",
+      bufferPages: true,
+    });
     const chunks: Buffer[] = [];
     doc.on("data", (chunk) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));

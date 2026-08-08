@@ -12,6 +12,7 @@ import {
   ClipboardCheck,
   AlertTriangle,
   Clock,
+  FileText,
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import type { UsageMetrics } from "@/lib/services/metrics.service";
@@ -365,6 +366,31 @@ export function MetricsBoard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ---------- Commercial ---------- */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-indigo-600" /> Business proposal
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            The proposal document for selling LecBook to a college: the value case, pricing tiers, a
+            full cost breakdown, what should and should not be charged for, and the contract terms
+            procurement will ask about. Edit the wording and figures in{" "}
+            <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs dark:bg-slate-800">
+              src/lib/content/proposal.ts
+            </code>
+            .
+          </p>
+          <a href="/api/proposal" target="_blank" rel="noreferrer">
+            <Button variant="outline">
+              <FileText className="h-4 w-4" /> Download the proposal (PDF)
+            </Button>
+          </a>
+        </CardContent>
+      </Card>
 
       {/* ---------- Security signals ---------- */}
       <Card>
