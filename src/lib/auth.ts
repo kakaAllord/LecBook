@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import type { UserRole } from "@prisma/client";
 import { ApiError } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
+import { touchSession } from "@/lib/session-activity";
 import {
   AUTH_COOKIE,
   AUTH_COOKIE_MAX_AGE,
@@ -112,6 +113,11 @@ export async function requireSession(): Promise<Session> {
   const session = await getSession();
   if (!session) {
     throw new ApiError("Not authenticated", 401);
+  }
+  // Heartbeat for the usage metrics. Skipped while impersonating so a super
+  // admin looking around does not register as the target being active.
+  if (!session.impersonatedById) {
+    touchSession(session.sid);
   }
   return session;
 }

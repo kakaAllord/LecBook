@@ -23,3 +23,37 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/*
+ * Chart palette. Both modes are selected steps of the same hues, validated as a
+ * set against their own surface — not an automatic flip of the light values.
+ * Series slots are assigned in fixed order and never cycled.
+ */
+.viz {
+  --viz-surface: #ffffff;
+  --viz-grid: #e2e8f0;
+  --viz-series-1: #2a78d6;
+  --viz-series-2: #eb6834;
+  --viz-series-3: #1baf7a;
+  --viz-series-4: #eda100;
+  /* Sequential blue ramp, light -> dark, for magnitude encoding. */
+  --viz-seq-200: #9ec5f4;
+  --viz-seq-350: #5598e7;
+  --viz-seq-450: #2a78d6;
+  --viz-seq-600: #184f95;
+  --viz-muted: #cbd5e1;
+}
+
+.dark .viz {
+  --viz-surface: #0f172a;
+  --viz-grid: #1e293b;
+  --viz-series-1: #3987e5;
+  --viz-series-2: #d95926;
+  --viz-series-3: #199e70;
+  --viz-series-4: #c98500;
+  --viz-seq-200: #184f95;
+  --viz-seq-350: #256abf;
+  --viz-seq-450: #3987e5;
+  --viz-seq-600: #86b6ef;
+  --viz-muted: #334155;
+}
