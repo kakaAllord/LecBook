@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AUTH_COOKIE } from "@/lib/auth-cookie";
 
-const PUBLIC_PATHS = ["/login"];
+// `/invite` is reached by lecturers who have no account password yet.
+const PUBLIC_PATHS = ["/login", "/invite"];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

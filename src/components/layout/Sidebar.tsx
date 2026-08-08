@@ -16,24 +16,44 @@ import {
   LogOut,
   Menu,
   X,
+  UserCog,
+  Terminal,
+  Activity,
+  type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api-client";
+import type { UserRole } from "@/types";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
-const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/courses", label: "Courses", icon: BookOpen },
-  { href: "/modules", label: "Modules", icon: Layers },
-  { href: "/students", label: "Students", icon: Users },
-  { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
-  { href: "/assessments", label: "Assessments", icon: ListChecks },
-  { href: "/reports", label: "Reports", icon: FileBarChart },
-  { href: "/settings", label: "Settings", icon: SettingsIcon },
+type NavItem = { href: string; label: string; icon: LucideIcon; roles: UserRole[] };
+
+const ALL: UserRole[] = ["SUPER_ADMIN", "ADMIN", "LECTURER"];
+const ADMINS: UserRole[] = ["SUPER_ADMIN", "ADMIN"];
+const SUPER: UserRole[] = ["SUPER_ADMIN"];
+
+const NAV_ITEMS: NavItem[] = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ALL },
+  { href: "/courses", label: "Courses", icon: BookOpen, roles: ADMINS },
+  { href: "/modules", label: "Modules", icon: Layers, roles: ADMINS },
+  { href: "/students", label: "Students", icon: Users, roles: ALL },
+  { href: "/attendance", label: "Attendance", icon: ClipboardCheck, roles: ALL },
+  { href: "/assessments", label: "Assessments", icon: ListChecks, roles: ALL },
+  { href: "/reports", label: "Reports", icon: FileBarChart, roles: ALL },
+  { href: "/admin/users", label: "People", icon: UserCog, roles: ADMINS },
+  { href: "/admin/metrics", label: "Metrics", icon: Activity, roles: SUPER },
+  { href: "/admin/logs", label: "Activity Log", icon: Terminal, roles: SUPER },
+  { href: "/settings", label: "Settings", icon: SettingsIcon, roles: ADMINS },
 ];
 
-export function Sidebar({ userName }: { userName: string }) {
+const ROLE_LABELS: Record<UserRole, string> = {
+  SUPER_ADMIN: "Super Admin",
+  ADMIN: "Administrator",
+  LECTURER: "Lecturer",
+};
+
+export function Sidebar({ userName, role }: { userName: string; role: UserRole }) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -41,7 +61,8 @@ export function Sidebar({ userName }: { userName: string }) {
 
   const { data: settings } = useQuery({
     queryKey: ["settings"],
-    queryFn: () => api.get<{ institutionName: string; institutionLogo: string | null }>("/api/settings"),
+    queryFn: () =>
+      api.get<{ institutionName: string; institutionLogo: string | null }>("/api/settings"),
     staleTime: 5 * 60_000,
   });
 
@@ -67,9 +88,11 @@ export function Sidebar({ userName }: { userName: string }) {
     }
   }
 
+  const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
+
   const nav = (
     <nav className="flex-1 space-y-1 px-3 py-4">
-      {NAV_ITEMS.map((item) => {
+      {visibleItems.map((item) => {
         const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
         const Icon = item.icon;
         return (
@@ -128,7 +151,7 @@ export function Sidebar({ userName }: { userName: string }) {
         <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 dark:border-slate-800">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{userName}</p>
-            <p className="text-xs text-slate-400">Lecturer</p>
+            <p className="text-xs text-slate-400">{ROLE_LABELS[role]}</p>
           </div>
           <div className="flex items-center gap-1">
             <ThemeToggle />

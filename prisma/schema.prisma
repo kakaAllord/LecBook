@@ -7,12 +7,115 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  LECTURER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
 model User {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   name      String
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
+  email     String     @unique
+  // Null until an invited user accepts their invite and sets a password.
+  password  String?
+  role      UserRole   @default(LECTURER)
+  status    UserStatus @default(ACTIVE)
+  phone     String?
+  title     String?
+  staffId   String?
+  // The admin (or super admin) who created this account.
+  createdById String?
+  lastLoginAt DateTime?
+  loginCount  Int      @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @default(now()) @updatedAt
+
+  createdBy    User?  @relation("UserCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdUsers User[] @relation("UserCreator")
+
+  courses  Course[] @relation("CourseLecturers")
+  modules  Module[] @relation("ModuleLecturers")
+
+  invites    Invite[]
+  sessions   UserSession[]
+  auditLogs  AuditLog[]
+  attendance Attendance[]
+
+  @@index([role])
+  @@index([createdById])
+}
+
+model Invite {
+  id         String    @id @default(cuid())
+  token      String    @unique
+  userId     String
+  createdById String?
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum DeviceType {
+  DESKTOP
+  MOBILE
+  TABLET
+  UNKNOWN
+}
+
+model UserSession {
+  id         String     @id @default(cuid())
+  userId     String
+  ip         String?
+  userAgent  String?
+  deviceType DeviceType @default(UNKNOWN)
+  browser    String?
+  os         String?
+  createdAt  DateTime   @default(now())
+  lastSeenAt DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([lastSeenAt])
+}
+
+model AuditLog {
+  id     String  @id @default(cuid())
+  userId String?
+  // Denormalized so the trail survives the actor being deleted.
+  actorName  String
+  actorEmail String
+  actorRole  UserRole
+  action     String
+  entity     String
+  entityId   String?
+  summary    String
+  metadata   Json?
+  ip         String?
+  userAgent  String?
+  // Set when a super admin performed this while viewing as another user.
+  impersonatedById String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
+  @@index([entity])
 }
 
 model Settings {
@@ -35,6 +138,7 @@ model Course {
   students    Student[]
   modules     Module[]     @relation("ModuleCourses")
   assessments Assessment[] @relation("AssessmentCourses")
+  lecturers   User[]       @relation("CourseLecturers")
 }
 
 model Module {
@@ -46,6 +150,7 @@ model Module {
   courses     Course[]     @relation("ModuleCourses")
   attendance  Attendance[]
   assessments Assessment[]
+  lecturers   User[]       @relation("ModuleLecturers")
 }
 
 enum StudentStatus {
@@ -82,14 +187,19 @@ model Attendance {
   date      DateTime
   status    AttendanceStatus
   remarks   String?
+  // The lecturer/admin who last saved this record.
+  recordedById String?
   createdAt DateTime         @default(now())
+  updatedAt DateTime         @default(now()) @updatedAt
 
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  module  Module  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  student    Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  module     Module  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  recordedBy User?   @relation(fields: [recordedById], references: [id], onDelete: SetNull)
 
   @@unique([studentId, moduleId, date])
   @@index([date])
   @@index([moduleId])
+  @@index([recordedById])
 }
 
 model Assessment {

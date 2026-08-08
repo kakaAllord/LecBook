@@ -27,7 +27,7 @@ function randomInt(min: number, max: number): number {
 async function main() {
   console.log("Seeding database...");
 
-  await seedCredentials(prisma);
+  const { lecturer } = await seedCredentials(prisma);
 
   const courseData = [
     { name: "Electrical Engineering", level: "Level 5", semester: "Semester II", academicYear: "2026" },
@@ -70,6 +70,17 @@ async function main() {
     modules.push(module_);
   }
   console.log(`Created ${modules.length} modules`);
+
+  // The admin assigns the lecturer their courses; that assignment is what makes
+  // the students show up for them without them registering anyone.
+  await prisma.user.update({
+    where: { id: lecturer.id },
+    data: {
+      courses: { set: courses.map((c) => ({ id: c.id })) },
+      modules: { set: modules.map((m) => ({ id: m.id })) },
+    },
+  });
+  console.log(`Assigned ${courses.length} courses to the seeded lecturer`);
 
   let regCounter = 1;
   const students = [];

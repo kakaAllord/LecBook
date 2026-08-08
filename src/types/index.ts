@@ -1,5 +1,58 @@
 export type StudentStatus = "ACTIVE" | "INACTIVE";
 export type AttendanceStatus = "PRESENT" | "ABSENT";
+export type UserRole = "SUPER_ADMIN" | "ADMIN" | "LECTURER";
+export type UserStatus = "ACTIVE" | "INACTIVE" | "PENDING";
+export type DeviceType = "DESKTOP" | "MOBILE" | "TABLET" | "UNKNOWN";
+
+export type ManagedUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  status: UserStatus;
+  phone: string | null;
+  title: string | null;
+  staffId: string | null;
+  createdById: string | null;
+  lastLoginAt: string | null;
+  loginCount: number;
+  createdAt: string;
+  createdBy: { id: string; name: string; email: string } | null;
+  courses: { id: string; name: string; level: string; semester: string }[];
+  modules: { id: string; name: string; code: string | null }[];
+  _count: { createdUsers: number; sessions: number };
+};
+
+export type CurrentUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  status: UserStatus;
+  phone: string | null;
+  title: string | null;
+  createdAt: string;
+  lastLoginAt: string | null;
+  courses: { id: string; name: string }[];
+  impersonatedBy: { id: string; name: string } | null;
+};
+
+export type AuditLogEntry = {
+  id: string;
+  userId: string | null;
+  actorName: string;
+  actorEmail: string;
+  actorRole: UserRole;
+  action: string;
+  entity: string;
+  entityId: string | null;
+  summary: string;
+  metadata: Record<string, unknown> | null;
+  ip: string | null;
+  userAgent: string | null;
+  impersonatedById: string | null;
+  createdAt: string;
+};
 
 export type Course = {
   id: string;
