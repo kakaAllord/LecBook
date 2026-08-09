@@ -50,6 +50,7 @@ next-env.d.ts
 
 # Generated documents
 LecBook-Business-Proposal-*.pdf
+public/getting-started-guide.pdf
 
 # Local-only notes and credentials
 *.local.md

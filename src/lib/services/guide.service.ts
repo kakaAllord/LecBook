@@ -4,127 +4,247 @@ const ACCENT = "#4f46e5";
 const MUTED = "#6b7280";
 const TEXT = "#111827";
 
+type Role = "SUPER_ADMIN" | "ADMIN" | "LECTURER";
+
 type Section = {
   title: string;
   intro?: string;
   steps: string[];
+  /** Who this section is written for. Omitted means everybody. */
+  roles?: Role[];
 };
 
+const ROLE_TITLES: Record<Role, string> = {
+  SUPER_ADMIN: "for the Super Admin",
+  ADMIN: "for Administrators",
+  LECTURER: "for Lecturers",
+};
+
+/**
+ * The guide is assembled for whoever asks for it. Each account signs into its
+ * own workspace, so a lecturer should not be reading about adding courses and
+ * an administrator should not be told to take a register they cannot open.
+ */
 const SECTIONS: Section[] = [
   {
     title: "1. Logging In",
-    intro: "Open the app in your browser and sign in with your lecturer account.",
+    intro: "Open the app in your browser and sign in with the account you were given.",
     steps: [
       "Go to the app's login page.",
-      "Enter your email and password, then click \"Sign in\".",
-      "You'll land on the Dashboard once signed in. Your session stays active until you log out or it expires.",
+      'Enter your email and password, then click "Sign in".',
+      "If you were sent an invite link instead, open it, choose a password, and sign in with that.",
+      "You land on your Dashboard. What is on it, and the pages listed down the sidebar, depend on the account you signed in with — administrators and lecturers get different workspaces.",
       "Use the logout icon at the bottom of the sidebar to sign out.",
     ],
   },
+
+  // ------------------------------------------------------------- super admin
   {
     title: "2. Dashboard",
-    intro: "Your home screen — a quick snapshot of everything happening right now.",
+    intro: "How the system is actually being used, which is what the operations account exists to read.",
+    roles: ["SUPER_ADMIN"],
     steps: [
-      "Total Students, Courses, Today's Attendance and Assessments are shown as summary cards at the top.",
-      "\"Quick Actions\" cards jump straight to Students, Courses, Attendance, Assessments or Reports.",
-      "\"Recent Assessments\" lists the latest assessments you've created, with course and date.",
+      "Engagement: active accounts, daily and monthly actives, and how many people came back over the last 7, 30 or 90 days.",
+      "Devices: the phone, tablet and computer split, so you know which screen the work really happens on.",
+      "Feature usage: which parts of the system carry the load — attendance, assessments, reports, account management.",
+      "Onboarding health: accounts created against accounts that have actually been activated.",
+      "Switch the window with the 7 / 30 / 90 day buttons at the top right.",
     ],
   },
   {
-    title: "3. Courses",
-    intro: "Set up the courses you teach before registering students against them.",
+    title: "3. Users",
+    intro: "Every administrator and lecturer on the system.",
+    roles: ["SUPER_ADMIN"],
     steps: [
-      "Open Courses from the sidebar.",
-      "Click \"New Course\" and fill in Name, Level, Semester and Academic Year (e.g. Electrical Engineering, Level 5, Semester II, 2026).",
-      "Use the search bar to find a course, or the pencil/trash icons on a row to edit or delete it.",
-      "A course with students or assessments already linked to it cannot be deleted until those are removed.",
+      "Search by name, email or staff ID, and filter by role or status.",
+      '"Add administrator" creates the account that runs an institution: fill in their details and you are handed a one-time invite link to send them. It expires in 14 days.',
+      "The open-in-new-tab icon signs you into that account's view read-only — you see exactly what they see, with a banner at the top to return to your own account. Nothing can be changed while viewing as someone else.",
+      "The power icon activates or deactivates an account. Deactivating also ends any session they currently have open.",
+      "Courses, students and lecturers are not created here: they belong to the administrator's own workspace.",
+    ],
+  },
+  {
+    title: "4. Logs",
+    intro: "Every action taken in the system, by whom, and when.",
+    roles: ["SUPER_ADMIN"],
+    steps: [
+      "Entries are colour-coded by action family — accounts, students, attendance, assessments, reports, settings.",
+      "Click any line to expand it: the actor, the exact action, the record it touched, the IP address and the browser.",
+      "Filter by actor, by action (or a whole family), by free text, and by a From/To range that accepts a date and a time.",
+      '"Live tail" keeps the newest page refreshing on its own; pause it when you want to read.',
+      '"Replay" walks the current selection forwards in time, one entry at a time, at 0.5x to 4x speed — useful for watching a session unfold in the order it happened.',
+      'A "view-as" tag on a line means the action was taken while a super admin was viewing that account.',
+    ],
+  },
+
+  // ----------------------------------------------------------- administrator
+  {
+    title: "2. Dashboard",
+    intro: "The shape of the institution, and what is still half set up.",
+    roles: ["ADMIN"],
+    steps: [
+      "Totals for students, courses, modules and lecturers sit across the top.",
+      '"Needs your attention" lists the gaps: modules with no lecturer assigned, courses with no modules, courses with no students, and lecturers who have not opened their invite. Each line links to the page that closes it.',
+      '"Students per course" and "Teaching load" show where the numbers are concentrated.',
+      '"Attendance taken today" is every register saved across the institution today. Registers themselves are taken by lecturers in their own accounts.',
+    ],
+  },
+  {
+    title: "3. Courses and Modules",
+    intro: "Set up what is taught before registering anyone against it.",
+    roles: ["ADMIN"],
+    steps: [
+      'Open Courses and click "New Course": Name, Level, Semester and Academic Year (e.g. Electrical Engineering, Level 5, Semester II, 2026).',
+      'Open Modules and click "New Module": a name, an optional code, and the courses that run it. One module can be shared by several courses.',
+      "Use the search bar to find a record, or the pencil and trash icons on a row to edit or delete it.",
+      "A course or module with records already attached cannot be deleted until those are removed.",
     ],
   },
   {
     title: "4. Students",
-    intro: "Register every student against the course they belong to.",
+    intro: "Register every student against the course they belong to. This is the administrator's job — lecturers never register anyone.",
+    roles: ["ADMIN"],
     steps: [
-      "Open Students from the sidebar and click \"Register Student\".",
+      'Open Students and click "Register Student".',
       "Fill in Registration Number (must be unique), Full Name, Gender, Phone (optional), Course and Status.",
       "Use the search box and the Course / Status filters to narrow the list.",
-      "Set a student's Status to Inactive instead of deleting them if they've left but you want to keep their history.",
+      "Set a student's Status to Inactive rather than deleting them if they have left but their history matters.",
+      "The download icon on a row exports that one student's full record — attendance and marks — as a PDF or as text you can paste into a message.",
     ],
   },
   {
-    title: "5. Attendance",
-    intro: "Mark attendance for a course, one date at a time.",
+    title: "5. Lecturers",
+    intro: "Add the people who teach, and decide what each of them teaches.",
+    roles: ["ADMIN"],
     steps: [
-      "Open Attendance, choose a Course and a Date (defaults to today).",
-      "Every active student in that course appears in a table. Click Present, Absent, Late or Excused for each student — Present is pre-selected by default.",
-      "Add an optional remark per student, then click \"Save Attendance\".",
-      "Saving the same course and date again updates that day's records instead of creating duplicates, so you can safely correct mistakes.",
-      "Click \"View History\" to see past dates for a course with Present/Absent/Late/Excused totals, and click \"Edit\" on any date to reopen and adjust it.",
+      'Open Lecturers and click "Add lecturer". Fill in their details in full — they will not be asked to re-type any of it.',
+      "Tick the modules they teach. This is the only assignment there is: every student on a course that runs one of those modules appears in that lecturer's account automatically.",
+      "On saving you are given a one-time invite link. Copy it and send it to them however you normally would; it expires in 14 days.",
+      "The chain-link icon issues a fresh link if the old one was lost or expired. The power icon activates or deactivates the account.",
+      "The pencil icon changes their details or their modules at any time.",
+    ],
+  },
+
+  // ---------------------------------------------------------------- lecturer
+  {
+    title: "2. Dashboard",
+    intro: "Your own teaching at a glance.",
+    roles: ["LECTURER"],
+    steps: [
+      "Your students, your modules and your assessments are counted across the top, along with whether today's register has been taken.",
+      '"Attendance by module" shows how each of your modules is doing across every session recorded for it.',
+      '"Below your attendance bar" lists the students who have fallen under the threshold you set in Settings, worst first.',
+      '"Recent assessments" links straight back into marks entry.',
     ],
   },
   {
-    title: "6. Assessment Types",
-    intro: "Assessment types are fully customizable — nothing is hardcoded.",
+    title: "3. Students",
+    intro: "Everyone on a course that runs one of your modules.",
+    roles: ["LECTURER"],
     steps: [
-      "Open Assessments, then \"Assessment Types\".",
-      "Click \"New Type\" and set a Name, Max Marks, and an optional Description (e.g. Quiz — 20 marks, Practical — 50 marks).",
-      "Create as many types as you need — Test, Assignment, Presentation, Project, Lab, or anything specific to your course.",
-      "A type already used by an assessment cannot be deleted.",
+      "The roll is read-only: registration and corrections are the administrator's responsibility, so there is one record of a student rather than several.",
+      "Search and filter to find someone quickly.",
+      "The download icon exports one student's full record as a PDF or as text.",
+      "If someone is missing, ask your administrator to register them, or to assign you the module their course runs.",
     ],
   },
   {
-    title: "7. Assessments & Marks",
-    intro: "Create an assessment, then record marks for every student in that course.",
+    title: "4. Attendance",
+    intro: "Mark a register for one module on one date.",
+    roles: ["LECTURER"],
     steps: [
-      "Open Assessments and click \"New Assessment\".",
-      "Choose a Course, an Assessment Type, give it a Title (e.g. \"Quiz 1\") and a Date, then submit.",
-      "You're taken straight to the marks entry screen, listing every active student in that course.",
-      "Enter each student's marks — the system will not let you save a mark above the type's maximum (e.g. more than 20 for a Quiz worth 20).",
-      "Marks can be revisited and edited at any time from the Assessments list.",
-      "The page also shows a live Average, Highest and Lowest as you enter marks.",
+      "Open Attendance, choose a Module, tick the courses sitting in the session, and pick the Date (defaults to today).",
+      "Every active student in those courses appears in a table. Mark each one Present or Absent — Present is pre-selected — and add a remark if you need to.",
+      'Click "Save Attendance". Saving the same module and date again updates that day rather than duplicating it, so corrections are safe.',
+      '"View History" lists past sessions with their totals. "Edit" reopens a day to change individual students.',
+      "The spanner icon repairs a whole session filed wrongly — it moves every record to the right module, date or set of courses in one go.",
     ],
   },
   {
-    title: "8. Reports",
-    intro: "Generate printable PDF reports at any time.",
+    title: "5. Assessments and Marks",
+    intro: "Create an assessment against a module, then record marks.",
+    roles: ["LECTURER"],
     steps: [
-      "Open Reports from the sidebar.",
-      "Attendance Report: choose a Course and an optional date range, then \"Download PDF\" — it lists every student with their Present/Absent/Late/Excused counts and attendance percentage.",
-      "Assessment Report: choose a Course to filter, then pick an Assessment and \"Download PDF\" — it lists every student's marks along with the average, highest and lowest scores.",
-      "Every report is headed with your Institution Name, set on the Settings page.",
+      'Open Assessments and click "New Assessment".',
+      "Choose the Module first: the page then tells you how many marks are still available out of the module's 60-mark cap, and how many are already allocated.",
+      'Tick the courses the assessment applies to, name it (e.g. "Quiz 1"), set its marks and date, then submit.',
+      "You land straight on marks entry, listing every active student. Marks above the assessment maximum are rejected as you type.",
+      "Average, highest and lowest update live as you enter marks, and marks can be revisited from the Assessments list at any time.",
+    ],
+  },
+
+  // ------------------------------------------------------------------ shared
+  {
+    title: "6. Reports",
+    intro: "Printable PDFs, generated on demand.",
+    roles: ["ADMIN", "LECTURER"],
+    steps: [
+      'Attendance Report: choose a module, optionally one course and a date range, then "Download PDF" — a tick-sheet register, one row per student and one column per date, with totals, percentages and a signature column.',
+      'Assessment Report: choose a module and either one assessment or all of them, then "Download PDF" — marks per student with average, highest and lowest, and a signature column.',
+      "Student Report: search for one student, then ask for either their attendance (any modules, any date range) or their marks (any modules, any assessments). Leaving a selection empty means all of it.",
+      "Every report is headed with the Institution Name and logo set by the administrator.",
     ],
   },
   {
-    title: "9. Settings",
-    intro: "System-wide configuration used across the app and your reports.",
+    title: "7. Settings",
+    intro: "How the institution presents itself.",
+    roles: ["ADMIN"],
     steps: [
-      "Open Settings from the sidebar.",
-      "Set your Institution Name — it appears in the sidebar and at the top of every generated PDF report.",
-      "This is also where you can re-download this Getting Started Guide at any time.",
+      "Set the Institution Name — it appears in the sidebar and at the top of every generated PDF.",
+      "Upload an Institution Logo; it is resized automatically and printed on reports alongside the name.",
+      "This is also where you can re-download this guide at any time.",
+      "Attendance thresholds and pass marks are not set here: each lecturer sets their own, for the modules they teach.",
+    ],
+  },
+  {
+    title: "7. Settings",
+    intro: "The bar your own students are measured against.",
+    roles: ["LECTURER"],
+    steps: [
+      'Minimum Attendance Threshold: students below it are flagged "LOW" on your attendance reports and listed on your dashboard.',
+      "Assessment Pass Mark: students at or above it are marked PASS on your reports, below it REDO.",
+      "Until you save your own figures the institution defaults apply — both are shown next to each field.",
+      "This is also where you can re-download this guide at any time.",
     ],
   },
   {
     title: "Tips",
     steps: [
       "Toggle dark mode any time with the sun/moon icon at the bottom of the sidebar — your choice is remembered.",
-      "Every list (Courses, Students) has a search bar and, where useful, filters and pagination.",
+      "Every list has a search bar and, where useful, filters and pagination.",
       "Deleting anything always asks for confirmation first, so accidental clicks are safe.",
+      "Typing a number and then scrolling the page will not change the number — marks stay exactly as you entered them.",
     ],
   },
 ];
 
-function addCoverPage(doc: PDFKit.PDFDocument, institutionName: string) {
+/** The sections written for one account, or all of them when no role is given. */
+function sectionsFor(role?: Role) {
+  return role
+    ? SECTIONS.filter((section) => !section.roles || section.roles.includes(role))
+    : SECTIONS;
+}
+
+function addCoverPage(
+  doc: PDFKit.PDFDocument,
+  institutionName: string,
+  sections: Section[],
+  role?: Role
+) {
   doc.rect(0, 0, doc.page.width, 230).fill(ACCENT);
 
   doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(28).text("Getting Started Guide", 50, 90, { align: "left" });
 
   doc.font("Helvetica").fontSize(14).text("Lecturer Record Management System (LRMS)", 50, 130);
 
-  doc.fontSize(11).text(institutionName, 50, 155);
+  doc.fontSize(11).text(role ? `${institutionName} — ${ROLE_TITLES[role]}` : institutionName, 50, 155);
 
   doc.fillColor(TEXT).font("Helvetica").fontSize(11);
   doc.moveDown(8);
   doc.text(
-    "This guide walks you through every feature of the system, from signing in to generating your first reports. Work through it in order the first time, or jump straight to the section you need.",
+    role
+      ? "This guide covers the account you signed in with, from your first login to generating your reports. Work through it in order the first time, or jump straight to the section you need."
+      : "This guide covers all three accounts the system is built around — the super admin who operates it, the administrator who runs the institution's records, and the lecturer who teaches.",
     50,
     270,
     { width: doc.page.width - 100 }
@@ -134,19 +254,26 @@ function addCoverPage(doc: PDFKit.PDFDocument, institutionName: string) {
   doc.font("Helvetica-Bold").fontSize(11).fillColor(TEXT).text("Contents", 50);
   doc.moveDown(0.3);
   doc.font("Helvetica").fontSize(10).fillColor(MUTED);
-  for (const section of SECTIONS) {
-    doc.text(section.title, 60);
+  for (const section of sections) {
+    const audience = !role && section.roles ? ` (${section.roles.map((r) => ROLE_TITLES[r]).join(", ")})` : "";
+    doc.text(`${section.title}${audience}`, 60);
   }
 }
 
-function addSection(doc: PDFKit.PDFDocument, section: Section) {
+function addSection(doc: PDFKit.PDFDocument, section: Section, role?: Role) {
   if (doc.y > doc.page.height - doc.page.margins.bottom - 100) {
     doc.addPage();
   } else {
     doc.moveDown(1.2);
   }
 
-  doc.font("Helvetica-Bold").fontSize(15).fillColor(ACCENT).text(section.title);
+  // Without a role the reader is getting all three workspaces at once, so each
+  // section has to say whose it is.
+  const heading =
+    !role && section.roles
+      ? `${section.title} — ${section.roles.map((r) => ROLE_TITLES[r]).join(", ")}`
+      : section.title;
+  doc.font("Helvetica-Bold").fontSize(15).fillColor(ACCENT).text(heading);
   doc
     .strokeColor("#e5e7eb")
     .lineWidth(1)
@@ -174,7 +301,11 @@ function addSection(doc: PDFKit.PDFDocument, section: Section) {
   }
 }
 
-export async function generateGettingStartedGuide(institutionName: string): Promise<Buffer> {
+export async function generateGettingStartedGuide(
+  institutionName: string,
+  role?: Role
+): Promise<Buffer> {
+  const sections = sectionsFor(role);
   const doc = new PDFDocument({ size: "A4", margin: 50, bufferPages: true });
   const chunks: Buffer[] = [];
   doc.on("data", (chunk) => chunks.push(chunk));
@@ -184,11 +315,11 @@ export async function generateGettingStartedGuide(institutionName: string): Prom
     doc.on("error", reject);
   });
 
-  addCoverPage(doc, institutionName);
+  addCoverPage(doc, institutionName, sections, role);
   doc.addPage();
 
-  for (const section of SECTIONS) {
-    addSection(doc, section);
+  for (const section of sections) {
+    addSection(doc, section, role);
   }
 
   const range = doc.bufferedPageRange();

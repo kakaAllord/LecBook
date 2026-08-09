@@ -7,9 +7,10 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    await requireSession();
+    const session = await requireSession();
     const settings = await getSettings();
-    const pdf = await generateGettingStartedGuide(settings.institutionName);
+    // The guide is written for the account asking for it.
+    const pdf = await generateGettingStartedGuide(settings.institutionName, session.role);
 
     return new Response(new Uint8Array(pdf), {
       status: 200,
