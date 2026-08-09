@@ -3,16 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  UserCog,
-  Link2,
-  ExternalLink,
-  Power,
-  PowerOff,
-} from "lucide-react";
+import { UserCog, ExternalLink, Power, PowerOff } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiClientError } from "@/lib/api-client";
 import type { ManagedUser, Paginated, UserRole } from "@/types";
@@ -23,10 +14,7 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Badge } from "@/components/ui/Badge";
-import { UserFormDialog } from "./UserFormDialog";
-import { InviteLinkDialog } from "./InviteLinkDialog";
 
 const ROLE_LABELS: Record<UserRole, string> = {
   SUPER_ADMIN: "Super Admin",
@@ -42,18 +30,18 @@ function statusColor(status: string) {
   return status === "ACTIVE" ? "emerald" : status === "PENDING" ? "amber" : "rose";
 }
 
-export function UsersBoard({ viewerRole, viewerId }: { viewerRole: UserRole; viewerId: string }) {
+/**
+ * Every account in the system, and exactly two things to do with one: open it
+ * and see what its owner sees, or switch it off. Records are authored inside
+ * the account that owns them — this page observes and gates.
+ */
+export function UsersBoard() {
   const queryClient = useQueryClient();
-  const isSuperAdmin = viewerRole === "SUPER_ADMIN";
 
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<ManagedUser | null>(null);
-  const [deleting, setDeleting] = useState<ManagedUser | null>(null);
-  const [invite, setInvite] = useState<{ name: string; email: string; url: string } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-users", search, role, status, page],
@@ -78,51 +66,14 @@ export function UsersBoard({ viewerRole, viewerId }: { viewerRole: UserRole; vie
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/api/admin/users/${id}`),
-    onSuccess: () => {
-      toast.success("Account deleted");
-      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      setDeleting(null);
-    },
-    onError: (error) => {
-      toast.error(error instanceof ApiClientError ? error.message : "Could not delete account");
-    },
-  });
-
-  const inviteMutation = useMutation({
-    mutationFn: (user: ManagedUser) =>
-      api
-        .post<{ inviteUrl: string }>(`/api/admin/users/${user.id}/invite`)
-        .then((result) => ({ user, inviteUrl: result.inviteUrl })),
-    onSuccess: ({ user, inviteUrl }) => {
-      setInvite({ name: user.name, email: user.email, url: inviteUrl });
-      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-    },
-    onError: (error) => {
-      toast.error(error instanceof ApiClientError ? error.message : "Could not create an invite link");
-    },
-  });
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">People</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            {isSuperAdmin
-              ? "Every administrator and the lecturers they have added."
-              : "The lecturers you have added and the modules assigned to them."}
-          </p>
-        </div>
-        <Button
-          onClick={() => {
-            setEditing(null);
-            setFormOpen(true);
-          }}
-        >
-          <Plus className="h-4 w-4" /> Add person
-        </Button>
+      <div>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Users</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Every administrator and lecturer on the system. Open an account to see exactly what they see,
+          or switch their access on and off.
+        </p>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -135,20 +86,18 @@ export function UsersBoard({ viewerRole, viewerId }: { viewerRole: UserRole; vie
           placeholder="Search by name, email or staff ID..."
           className="sm:max-w-xs"
         />
-        {isSuperAdmin && (
-          <Select
-            value={role}
-            onChange={(e) => {
-              setRole(e.target.value);
-              setPage(1);
-            }}
-            className="sm:max-w-[180px]"
-          >
-            <option value="">All roles</option>
-            <option value="ADMIN">Administrators</option>
-            <option value="LECTURER">Lecturers</option>
-          </Select>
-        )}
+        <Select
+          value={role}
+          onChange={(e) => {
+            setRole(e.target.value);
+            setPage(1);
+          }}
+          className="sm:max-w-[180px]"
+        >
+          <option value="">All roles</option>
+          <option value="ADMIN">Administrators</option>
+          <option value="LECTURER">Lecturers</option>
+        </Select>
         <Select
           value={status}
           onChange={(e) => {
@@ -170,17 +119,7 @@ export function UsersBoard({ viewerRole, viewerId }: { viewerRole: UserRole; vie
         <EmptyState
           icon={UserCog}
           title="Nobody here yet"
-          description="Add a lecturer, assign their modules, and send them the invite link."
-          action={
-            <Button
-              onClick={() => {
-                setEditing(null);
-                setFormOpen(true);
-              }}
-            >
-              <Plus className="h-4 w-4" /> Add person
-            </Button>
-          }
+          description="Administrators and the lecturers they add will appear here."
         />
       ) : (
         <>
@@ -189,8 +128,8 @@ export function UsersBoard({ viewerRole, viewerId }: { viewerRole: UserRole; vie
               <TR>
                 <TH>Name</TH>
                 <TH>Role</TH>
-                <TH>Modules</TH>
-                {isSuperAdmin && <TH>Added by</TH>}
+                <TH>Scope</TH>
+                <TH>Added by</TH>
                 <TH>Last active</TH>
                 <TH>Status</TH>
                 <TH className="text-right">Actions</TH>
@@ -214,7 +153,9 @@ export function UsersBoard({ viewerRole, viewerId }: { viewerRole: UserRole; vie
                       user.modules.length > 0 ? (
                         <span className="text-xs">{user.modules.map((m) => m.name).join(", ")}</span>
                       ) : (
-                        <span className="text-xs text-amber-600 dark:text-amber-500">None assigned</span>
+                        <span className="text-xs text-amber-600 dark:text-amber-500">
+                          No modules assigned
+                        </span>
                       )
                     ) : (
                       <span className="text-xs text-slate-400">
@@ -222,9 +163,7 @@ export function UsersBoard({ viewerRole, viewerId }: { viewerRole: UserRole; vie
                       </span>
                     )}
                   </TD>
-                  {isSuperAdmin && (
-                    <TD className="text-xs text-slate-500">{user.createdBy?.name ?? "—"}</TD>
-                  )}
+                  <TD className="text-xs text-slate-500">{user.createdBy?.name ?? "—"}</TD>
                   <TD className="text-xs text-slate-500">
                     {user.lastLoginAt ? dayjs(user.lastLoginAt).format("DD MMM YYYY, HH:mm") : "Never"}
                   </TD>
@@ -235,33 +174,22 @@ export function UsersBoard({ viewerRole, viewerId }: { viewerRole: UserRole; vie
                   </TD>
                   <TD>
                     <div className="flex justify-end gap-1">
-                      {isSuperAdmin && user.status === "ACTIVE" && (
+                      {user.status === "ACTIVE" && (
                         <a
                           href={`/api/admin/impersonate/${user.id}`}
                           target="_blank"
                           rel="noreferrer"
-                          title={`Open ${user.name}'s dashboard in a new tab`}
+                          title={`Open the dashboard of ${user.name} in a new tab`}
                         >
                           <Button variant="ghost" size="sm">
-                            <ExternalLink className="h-4 w-4 text-indigo-500" />
+                            <ExternalLink className="h-4 w-4 text-violet-500" />
                           </Button>
                         </a>
-                      )}
-                      {user.status !== "ACTIVE" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          title="Generate a new invite link"
-                          loading={inviteMutation.isPending && inviteMutation.variables?.id === user.id}
-                          onClick={() => inviteMutation.mutate(user)}
-                        >
-                          <Link2 className="h-4 w-4 text-sky-500" />
-                        </Button>
                       )}
                       <Button
                         variant="ghost"
                         size="sm"
-                        title={user.status === "INACTIVE" ? "Activate" : "Deactivate"}
+                        title={user.status === "INACTIVE" ? "Activate account" : "Deactivate account"}
                         onClick={() =>
                           statusMutation.mutate({ id: user.id, active: user.status === "INACTIVE" })
                         }
@@ -272,22 +200,6 @@ export function UsersBoard({ viewerRole, viewerId }: { viewerRole: UserRole; vie
                           <PowerOff className="h-4 w-4 text-amber-500" />
                         )}
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        title="Edit"
-                        onClick={() => {
-                          setEditing(user);
-                          setFormOpen(true);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      {user.id !== viewerId && (
-                        <Button variant="ghost" size="sm" title="Delete" onClick={() => setDeleting(user)}>
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      )}
                     </div>
                   </TD>
                 </TR>
@@ -297,33 +209,6 @@ export function UsersBoard({ viewerRole, viewerId }: { viewerRole: UserRole; vie
           <Pagination page={data.page} totalPages={data.totalPages} onPageChange={setPage} />
         </>
       )}
-
-      <UserFormDialog
-        open={formOpen}
-        onClose={() => setFormOpen(false)}
-        user={editing}
-        viewerRole={viewerRole}
-        onInviteCreated={(user, inviteUrl) =>
-          setInvite({ name: user.name, email: user.email, url: inviteUrl })
-        }
-      />
-
-      <InviteLinkDialog
-        open={Boolean(invite)}
-        onClose={() => setInvite(null)}
-        name={invite?.name ?? ""}
-        email={invite?.email ?? ""}
-        inviteUrl={invite?.url ?? ""}
-      />
-
-      <ConfirmDialog
-        open={Boolean(deleting)}
-        onClose={() => setDeleting(null)}
-        onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
-        loading={deleteMutation.isPending}
-        title="Delete this account?"
-        description={`This permanently removes the account for "${deleting?.name}". Deactivate them instead if you want to keep their history and revoke access.`}
-      />
     </div>
   );
 }

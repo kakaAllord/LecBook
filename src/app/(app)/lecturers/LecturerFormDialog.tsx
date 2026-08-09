@@ -1,35 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { createUserSchema, type CreateUserInput } from "@/lib/validators/user";
 import { api, ApiClientError } from "@/lib/api-client";
-import type { ManagedUser, Module, UserRole } from "@/types";
+import type { ManagedUser, Module } from "@/types";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input, Label, FieldError } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { CheckboxGroup } from "@/components/ui/CheckboxGroup";
 
-export function UserFormDialog({
+/**
+ * The administrator fills in everything about the lecturer here — the account
+ * is complete before it is handed over. All the lecturer does with the invite
+ * link is choose a password.
+ */
+export function LecturerFormDialog({
   open,
   onClose,
-  user,
-  viewerRole,
+  lecturer,
   onInviteCreated,
 }: {
   open: boolean;
   onClose: () => void;
-  user?: ManagedUser | null;
-  viewerRole: UserRole;
-  onInviteCreated: (user: ManagedUser, inviteUrl: string) => void;
+  lecturer?: ManagedUser | null;
+  onInviteCreated: (lecturer: ManagedUser, inviteUrl: string) => void;
 }) {
   const queryClient = useQueryClient();
-  const isEdit = Boolean(user);
-  const [role, setRole] = useState<UserRole>("LECTURER");
+  const isEdit = Boolean(lecturer);
 
   const { data: modules } = useQuery({
     queryKey: ["modules", "all"],
@@ -47,28 +48,28 @@ export function UserFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    const initial: CreateUserInput = user
-      ? {
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          title: user.title ?? "",
-          phone: user.phone ?? "",
-          staffId: user.staffId ?? "",
-          moduleIds: user.modules.map((m) => m.id),
-        }
-      : {
-          name: "",
-          email: "",
-          role: "LECTURER",
-          title: "",
-          phone: "",
-          staffId: "",
-          moduleIds: [],
-        };
-    reset(initial);
-    setRole(initial.role);
-  }, [open, user, reset]);
+    reset(
+      lecturer
+        ? {
+            name: lecturer.name,
+            email: lecturer.email,
+            role: "LECTURER",
+            title: lecturer.title ?? "",
+            phone: lecturer.phone ?? "",
+            staffId: lecturer.staffId ?? "",
+            moduleIds: lecturer.modules.map((m) => m.id),
+          }
+        : {
+            name: "",
+            email: "",
+            role: "LECTURER",
+            title: "",
+            phone: "",
+            staffId: "",
+            moduleIds: [],
+          }
+    );
+  }, [open, lecturer, reset]);
 
   const onError = (error: unknown) => {
     toast.error(error instanceof ApiClientError ? error.message : "Something went wrong");
@@ -87,10 +88,10 @@ export function UserFormDialog({
 
   const updateMutation = useMutation({
     mutationFn: (data: CreateUserInput) =>
-      api.patch<ManagedUser>(`/api/admin/users/${user!.id}`, data),
+      api.patch<ManagedUser>(`/api/admin/users/${lecturer!.id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      toast.success("Account updated");
+      toast.success("Lecturer updated");
       onClose();
     },
     onError,
@@ -98,14 +99,12 @@ export function UserFormDialog({
 
   const submitting = createMutation.isPending || updateMutation.isPending;
 
-  const isLecturer = role === "LECTURER";
-
   return (
     <Dialog
       open={open}
       onClose={onClose}
       size="lg"
-      title={isEdit ? `Edit ${user?.name}` : "Add a person"}
+      title={isEdit ? `Edit ${lecturer?.name}` : "Add a lecturer"}
     >
       <form
         onSubmit={handleSubmit((data) =>
@@ -115,10 +114,12 @@ export function UserFormDialog({
       >
         {!isEdit && (
           <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
-            You enter their details and tick the modules they teach. They receive a one-time link, set
-            their own password, and start using the system.
+            Enter their details and tick the modules they teach. You will get a one-time link to send
+            them; opening it, they set a password and their students are already waiting.
           </p>
         )}
+
+        <input type="hidden" value="LECTURER" {...register("role")} />
 
         <div className="grid gap-4 sm:grid-cols-[110px_1fr]">
           <div>
@@ -132,7 +133,7 @@ export function UserFormDialog({
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <div>
             <Label htmlFor="email">Email</Label>
             <Input
@@ -145,21 +146,6 @@ export function UserFormDialog({
             <FieldError message={errors.email?.message} />
           </div>
           <div>
-            <Label htmlFor="role">Role</Label>
-            <Select
-              id="role"
-              error={errors.role?.message}
-              {...register("role", { onChange: (e) => setRole(e.target.value as UserRole) })}
-            >
-              <option value="LECTURER">Lecturer</option>
-              {viewerRole === "SUPER_ADMIN" && <option value="ADMIN">Administrator</option>}
-            </Select>
-            <FieldError message={errors.role?.message} />
-          </div>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
             <Label htmlFor="phone">Phone</Label>
             <Input id="phone" placeholder="0712345678" {...register("phone")} />
           </div>
@@ -169,28 +155,26 @@ export function UserFormDialog({
           </div>
         </div>
 
-        {isLecturer && (
-          <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
-            <Label htmlFor="moduleIds">Modules they teach</Label>
-            <Controller
-              name="moduleIds"
-              control={control}
-              render={({ field }) => (
-                <CheckboxGroup
-                  options={(modules ?? []).map((m) => ({
-                    id: m.id,
-                    label: m.code ? `${m.name} (${m.code})` : m.name,
-                  }))}
-                  value={field.value ?? []}
-                  onChange={field.onChange}
-                />
-              )}
-            />
-            <p className="mt-1 text-xs text-slate-400">
-              Every student on a course that runs these modules appears in their account automatically.
-            </p>
-          </div>
-        )}
+        <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
+          <Label htmlFor="moduleIds">Modules they teach</Label>
+          <Controller
+            name="moduleIds"
+            control={control}
+            render={({ field }) => (
+              <CheckboxGroup
+                options={(modules ?? []).map((m) => ({
+                  id: m.id,
+                  label: m.code ? `${m.name} (${m.code})` : m.name,
+                }))}
+                value={field.value ?? []}
+                onChange={field.onChange}
+              />
+            )}
+          />
+          <p className="mt-1 text-xs text-slate-400">
+            Every student on a course that runs these modules appears in their account automatically.
+          </p>
+        </div>
 
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={onClose}>

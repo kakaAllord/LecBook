@@ -1,7 +1,7 @@
 import { requireAdminPage } from "@/lib/guard";
-import { UsersBoard } from "@/app/(app)/admin/users/UsersBoard";
+import { LecturersBoard } from "./LecturersBoard";
 
 export default async function LecturersPage() {
-  const session = await requireAdminPage();
-  return <UsersBoard viewerRole={session.role} viewerId={session.sub} />;
+  await requireAdminPage();
+  return <LecturersBoard />;
 }
