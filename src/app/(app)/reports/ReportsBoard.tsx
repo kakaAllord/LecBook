@@ -11,6 +11,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Select";
 import { Input, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { StudentReportCard } from "./StudentReportCard";
 
 export function ReportsBoard({ role }: { role: UserRole }) {
   const { data: modules } = useQuery({
@@ -32,6 +33,7 @@ export function ReportsBoard({ role }: { role: UserRole }) {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <AttendanceReportCard modules={modules ?? []} />
         <AssessmentReportCard modules={modules ?? []} />
+        <StudentReportCard modules={modules ?? []} />
       </div>
     </div>
   );

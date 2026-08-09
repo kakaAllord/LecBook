@@ -20,6 +20,8 @@ export const studentExportSchema = z.object({
   includeAssessments: z.boolean(),
   /** Empty means every module the student has marks in. */
   assessmentModuleIds: z.array(z.string()).optional(),
+  /** Empty means every assessment; otherwise only these ones. */
+  assessmentIds: z.array(z.string()).optional(),
   includeMissingMarks: z.boolean(),
 });
 

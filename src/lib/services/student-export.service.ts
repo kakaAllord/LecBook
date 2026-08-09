@@ -26,6 +26,7 @@ export type StudentExportData = {
     attendanceRange: string;
     attendanceModules: string;
     assessmentModules: string;
+    assessments: string;
   };
   attendance?: {
     modules: {
@@ -80,6 +81,7 @@ export async function buildStudentExport(
 
   const attendanceModuleIds = options.attendanceModuleIds ?? [];
   const assessmentModuleIds = options.assessmentModuleIds ?? [];
+  const assessmentIds = options.assessmentIds ?? [];
 
   const from = options.attendanceFrom ? toUtcDayStart(options.attendanceFrom) ?? undefined : undefined;
   const to = options.attendanceTo ? toUtcDayEnd(options.attendanceTo) ?? undefined : undefined;
@@ -106,6 +108,7 @@ export async function buildStudentExport(
           : "All recorded dates",
       attendanceModules: attendanceModuleIds.length > 0 ? `${attendanceModuleIds.length} selected` : "All modules",
       assessmentModules: assessmentModuleIds.length > 0 ? `${assessmentModuleIds.length} selected` : "All modules",
+      assessments: assessmentIds.length > 0 ? `${assessmentIds.length} selected` : "All assessments",
     },
     thresholds: { attendance: settings.attendanceThreshold, passMark: settings.assessmentPassMark },
   };
@@ -169,6 +172,7 @@ export async function buildStudentExport(
       where: {
         courses: { some: { id: student.courseId } },
         ...(assessmentModuleIds.length > 0 ? { moduleId: { in: assessmentModuleIds } } : {}),
+        ...(assessmentIds.length > 0 ? { id: { in: assessmentIds } } : {}),
       },
       include: { module: true, marks: { where: { studentId } } },
       orderBy: [{ module: { name: "asc" } }, { date: "asc" }],
