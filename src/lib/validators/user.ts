@@ -19,13 +19,13 @@ export const updateUserSchema = createUserSchema.partial().extend({
   status: userStatusSchema.optional(),
 });
 
-/** What an invited lecturer fills in themselves to finish their account. */
+/**
+ * All an invited person does is choose a password. Their name, title, phone and
+ * staff ID were entered by the administrator who created the account, and the
+ * administrator remains the one who corrects them.
+ */
 export const acceptInviteSchema = z
   .object({
-    name: z.string().min(1, "Your full name is required").max(200),
-    title: z.string().max(50).optional().or(z.literal("")),
-    phone: z.string().max(30).optional().or(z.literal("")),
-    staffId: z.string().max(50).optional().or(z.literal("")),
     password: z.string().min(8, "Use at least 8 characters"),
     confirmPassword: z.string().min(1, "Confirm your password"),
   })

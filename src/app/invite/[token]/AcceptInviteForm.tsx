@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,6 +23,11 @@ type InviteDetails = {
   expiresAt: string;
 };
 
+/**
+ * The last step of onboarding, and the only one the invited person does: choose
+ * a password. Everything else about the account was entered by the administrator
+ * who created it, and is shown here to be checked rather than re-typed.
+ */
 export function AcceptInviteForm({ token }: { token: string }) {
   const router = useRouter();
 
@@ -36,22 +40,8 @@ export function AcceptInviteForm({ token }: { token: string }) {
   const {
     register,
     handleSubmit,
-    reset,
     formState: { errors },
   } = useForm<AcceptInviteInput>({ resolver: zodResolver(acceptInviteSchema) });
-
-  useEffect(() => {
-    if (data) {
-      reset({
-        name: data.name,
-        title: data.title ?? "",
-        phone: data.phone ?? "",
-        staffId: data.staffId ?? "",
-        password: "",
-        confirmPassword: "",
-      });
-    }
-  }, [data, reset]);
 
   const mutation = useMutation({
     mutationFn: (values: AcceptInviteInput) => api.post(`/api/invite/${token}`, values),
@@ -90,6 +80,13 @@ export function AcceptInviteForm({ token }: { token: string }) {
     );
   }
 
+  const details: [string, string][] = [
+    ["Name", `${data.title ? `${data.title} ` : ""}${data.name}`],
+    ["Email", data.email],
+    ["Phone", data.phone || "—"],
+    ["Staff ID", data.staffId || "—"],
+  ];
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10 dark:bg-slate-950">
       <div className="w-full max-w-lg">
@@ -100,14 +97,21 @@ export function AcceptInviteForm({ token }: { token: string }) {
             Welcome to LecBook
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            You&apos;ve been invited as {data.role === "ADMIN" ? "an administrator" : "a lecturer"}. Fill in
-            the rest of your details and choose a password to activate your account.
+            Your {data.role === "ADMIN" ? "administrator" : "lecturer"} account is ready. Choose a
+            password and it is yours.
           </p>
         </div>
 
         <div className="mb-4 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Signing in as</p>
-          <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">{data.email}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Your account</p>
+          <dl className="mt-2 grid gap-x-4 gap-y-1 text-sm sm:grid-cols-[90px_1fr]">
+            {details.map(([label, value]) => (
+              <div key={label} className="contents">
+                <dt className="text-slate-400">{label}</dt>
+                <dd className="truncate font-medium text-slate-900 dark:text-slate-100">{value}</dd>
+              </div>
+            ))}
+          </dl>
 
           {data.modules.length > 0 && (
             <div className="mt-4">
@@ -131,39 +135,19 @@ export function AcceptInviteForm({ token }: { token: string }) {
               </p>
             </div>
           )}
+
+          <p className="mt-4 text-xs text-slate-400">
+            Anything wrong here? Ask your administrator to correct it — they own these details.
+          </p>
         </div>
 
         <form
           onSubmit={handleSubmit((values) => mutation.mutate(values))}
           className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"
         >
-          <div className="grid gap-4 sm:grid-cols-[110px_1fr]">
-            <div>
-              <Label htmlFor="title">Title</Label>
-              <Input id="title" placeholder="Dr." {...register("title")} />
-            </div>
-            <div>
-              <Label htmlFor="name">Full Name</Label>
-              <Input id="name" error={errors.name?.message} {...register("name")} />
-              <FieldError message={errors.name?.message} />
-            </div>
-          </div>
-
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label htmlFor="phone">Phone</Label>
-              <Input id="phone" placeholder="0712345678" {...register("phone")} />
-              <FieldError message={errors.phone?.message} />
-            </div>
-            <div>
-              <Label htmlFor="staffId">Staff ID</Label>
-              <Input id="staffId" placeholder="Optional" {...register("staffId")} />
-            </div>
-          </div>
-
-          <div className="grid gap-4 border-t border-slate-200 pt-4 sm:grid-cols-2 dark:border-slate-800">
-            <div>
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">New Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -187,7 +171,7 @@ export function AcceptInviteForm({ token }: { token: string }) {
           </div>
 
           <Button type="submit" className="w-full" loading={mutation.isPending}>
-            Activate my account
+            Set my password and activate
           </Button>
         </form>
       </div>

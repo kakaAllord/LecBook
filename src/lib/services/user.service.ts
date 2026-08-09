@@ -277,14 +277,7 @@ export async function acceptInvite(token: string, data: AcceptInviteInput) {
     prisma.invite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } }),
     prisma.user.update({
       where: { id: invite.userId },
-      data: {
-        name: data.name,
-        title: data.title || null,
-        phone: data.phone || null,
-        staffId: data.staffId || null,
-        password: passwordHash,
-        status: "ACTIVE",
-      },
+      data: { password: passwordHash, status: "ACTIVE" },
       select: userSelect,
     }),
   ]);
