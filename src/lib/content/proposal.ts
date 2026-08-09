@@ -14,7 +14,7 @@ export const PROPOSAL: Proposal = {
   subtitle: "A proposal to digitise attendance, assessment and academic records",
   preparedFor: "Prepared for: College leadership and procurement",
   preparedBy: "Prepared by: WickTechs",
-  version: "Version 1.0 · Draft for discussion",
+  version: "Version 1.1 · Draft for discussion",
   currencyNote: "All figures in Kenyan Shillings (KES). USD equivalents at KES 130 = USD 1.",
 
   sections: [
@@ -82,7 +82,7 @@ export const PROPOSAL: Proposal = {
         {
           type: "bullets",
           items: [
-            "Their students are already in the system. The administrator registers students and assigns courses; a lecturer signs in and their class is simply there.",
+            "Their students are already in the system. The administrator registers students and assigns each lecturer the modules they teach; a lecturer signs in and their class is simply there.",
             "Attendance is marked in a few taps per session, on a phone or a computer, with everyone defaulted to present.",
             "Assessments and marks are recorded per module, with the system enforcing the marks cap so totals cannot drift.",
             "A printable register with a signature column, so the paper trail and the digital record agree.",
@@ -94,10 +94,19 @@ export const PROPOSAL: Proposal = {
           type: "bullets",
           items: [
             "One place to register students, define courses and modules, and add lecturers.",
-            "Lecturers are onboarded by sending a one-time link — no shared passwords, and no administrator ever knows a lecturer's password.",
+            "Lecturers are onboarded by sending a one-time link — no shared passwords, and no administrator ever knows a lecturer's password. The administrator account itself is created the same way.",
             "Accounts can be deactivated the moment someone leaves, cutting off access immediately.",
             "Attendance and assessment reports for any module, course or date range, as printable PDFs.",
             "A complete record of any individual student — attendance per module, marks per assessment — filtered to whatever range is needed and exported as a PDF or copied as text.",
+          ],
+        },
+        { type: "subheading", text: "Who can do what" },
+        {
+          type: "bullets",
+          items: [
+            "Administrators own the records: courses, modules, students, and the lecturer accounts. They do not take registers.",
+            "Lecturers own the teaching: registers, marks, their own reports and their own thresholds. They see only the students on courses that run their modules, and cannot edit a student record.",
+            "We hold one operations account for support: it can read any account's screen, switch access on or off, and read the activity log — and it cannot change a college's records while doing so.",
           ],
         },
         { type: "subheading", text: "For the institution" },
@@ -105,9 +114,9 @@ export const PROPOSAL: Proposal = {
           type: "bullets",
           items: [
             "Evidence for regulator and audit requirements, produced on demand rather than reconstructed.",
-            "A full activity trail: every record change is attributed to a person, with a timestamp.",
+            "A full activity trail: every record change is attributed to a person, with a timestamp, and can be replayed in the order it happened.",
             "Early sight of students below the attendance threshold, while there is still time to act.",
-            "Institution-wide settings — attendance threshold, pass mark, name and logo — applied consistently to every report the college issues.",
+            "The college name and logo on every report it issues, with each lecturer setting the attendance threshold and pass mark for the modules they teach.",
           ],
         },
       ],
@@ -379,7 +388,7 @@ export const PROPOSAL: Proposal = {
           ],
           rows: [
             ["Agreement", "Contract, data processing agreement, invoice raised", "Week 0"],
-            ["Setup", "Institution details, courses, modules, thresholds", "Week 1"],
+            ["Setup", "Institution details, courses, modules, students", "Week 1"],
             ["Data migration", "Student roll loaded and verified with the registrar", "Week 1 – 2"],
             ["Administrator training", "One session, then admins add lecturers", "Week 2"],
             ["Lecturer onboarding", "Invite links issued; lecturers set their own passwords", "Week 2 – 3"],

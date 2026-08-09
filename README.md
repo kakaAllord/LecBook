@@ -112,12 +112,12 @@ npm run start
 | `npm run start` | Run the production build |
 | `npm run lint` | Run ESLint |
 | `npm run db:migrate` | Run Prisma migrations |
-| `npm run db:seed` | Seed the database with a lecturer login plus sample courses/students/assessments/attendance |
-| `npm run db:seed:creds` | Seed (or update) only the lecturer login — no demo data |
+| `npm run db:seed` | Seed the database with one login per role plus sample courses/modules/students/assessments/attendance |
+| `npm run db:seed:creds` | Seed (or update) the super admin, administrator and lecturer logins — no demo data |
 | `npm run db:seed:all` | Alias for `npm run db:seed` |
 | `npm run db:studio` | Open Prisma Studio to inspect the database |
-| `npm run db:clear` | **Destructive.** Wipes courses, students, attendance, assessments, marks and settings — leaves only the `User` table (login credentials) intact. Use this to reset a demo/training environment back to a blank slate without losing the login. |
-| `npm run docs:guide` | Optional: writes a static copy to `public/getting-started-guide.pdf` (optionally pass an institution name, e.g. `npm run docs:guide -- "My College"`). Not used by the app — Settings links to `/api/getting-started-guide`, which generates it live. |
+| `npm run db:clear` | **Destructive.** Wipes courses, modules, students, attendance, assessments, marks and settings — leaves only the `User` table (login credentials) intact. Use this to reset a demo/training environment back to a blank slate without losing the login. |
+| `npm run docs:guide` | Optional: writes a static copy to `public/getting-started-guide.pdf` covering all three roles (optionally pass an institution name, e.g. `npm run docs:guide -- "My College"`). Not used by the app — Settings links to `/api/getting-started-guide`, which generates a role-specific one live. |
 
 ## Features
 
@@ -127,7 +127,7 @@ the account you sign in with, not by rows greyed out in a shared menu.
 ### Super admin — operations
 
 - **Dashboard** — how the product is actually used: returning admins, daily and monthly actives, phone/computer split, feature usage, onboarding health.
-- **Users** — every administrator and lecturer, with two actions each: open their account in a new tab exactly as they see it ("view as", read-only), or switch their access on and off.
+- **Users** — every administrator and lecturer. "Add administrator" creates the account that runs an institution and hands back a one-time invite link; each row then offers two actions: open that account in a new tab exactly as its owner sees it ("view as", read-only), or switch their access on and off.
 - **Logs** — the full activity trail in a terminal, colour-coded by action family, filterable by actor, action, and a from/to range down to the minute. Tail it live, or replay the selection forwards in time at 0.5x–4x.
 
 ### Administrator — the institution's records
@@ -151,7 +151,23 @@ the account you sign in with, not by rows greyed out in a shared menu.
 ### Everywhere
 
 - **Dark mode** — toggle in the sidebar, persisted to `localStorage`.
-- **Getting Started guide** — a PDF generated on demand (`/api/getting-started-guide`, downloadable from Settings), with the institution name pulled live from Settings.
+- **Getting Started guide** — a PDF generated on demand (`/api/getting-started-guide`, downloadable from Settings), written for the role of whoever asks for it, with the institution name pulled live from Settings.
+
+## Keeping the documents honest
+
+Everything that describes this system is generated from, or lives beside, the
+code that implements it:
+
+| Document | Source | Regenerate with |
+| --- | --- | --- |
+| `README.md` | hand-written | — |
+| Getting Started guide (PDF) | `src/lib/services/guide.service.ts` | `npm run docs:guide` |
+| Business proposal (PDF) | `src/lib/content/proposal.ts` | `npm run docs:proposal` |
+| `plan.md` | the original brief, kept as history | — |
+
+Before any commit that changes behaviour, these are checked against what the
+code now does and corrected in the same change. See `AGENTS.md` for the working
+rule.
 
 ## Notes
 

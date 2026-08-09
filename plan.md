@@ -1,3 +1,9 @@
+> **Historical document.** This is the original build brief, kept for the record.
+> It describes an MVP on a Vite + Express stack with course-level attendance; the
+> system that was actually built is a single Next.js application with three role
+> workspaces and module-level teaching. For what the system does today, read
+> `README.md`; do not treat anything below as current.
+
 # Build a Lecturer Record Management System (MVP)
 
 Build a full-stack web application called **Lecturer Record Management System (LRMS)**.
