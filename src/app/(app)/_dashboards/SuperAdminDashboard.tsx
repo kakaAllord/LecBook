@@ -51,7 +51,7 @@ const FEATURE_LABELS: Record<string, string> = {
   settings: "Settings",
 };
 
-export function MetricsBoard() {
+export function SuperAdminDashboard() {
   const [range, setRange] = useState(30);
 
   const { data, isLoading } = useQuery({
@@ -62,7 +62,7 @@ export function MetricsBoard() {
   if (isLoading || !data) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Metrics</h1>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Dashboard</h1>
         <LoadingSpinner />
       </div>
     );
@@ -75,7 +75,7 @@ export function MetricsBoard() {
     <div className="space-y-8">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Metrics</h1>
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Dashboard</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             How the system is actually being used — who returns, on what, and how much work it carries.
           </p>

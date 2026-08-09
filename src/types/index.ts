@@ -152,19 +152,6 @@ export type AssessmentDetail = {
   students: AssessmentStudentEntry[];
 };
 
-export type DashboardSummary = {
-  totalStudents: number;
-  activeStudents: number;
-  totalCourses: number;
-  totalAssessments: number;
-  todayAttendance: {
-    present: number;
-    absent: number;
-    total: number;
-  };
-  recentAssessments: Assessment[];
-};
-
 export type Settings = {
   id: string;
   institutionName: string;
