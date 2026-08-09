@@ -6,7 +6,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Settings as SettingsIcon, Download, Image as ImageIcon, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { settingsSchema, type SettingsInput } from "@/lib/validators/settings";
+import {
+  institutionSettingsSchema,
+  type InstitutionSettingsInput,
+} from "@/lib/validators/settings";
 import { api, ApiClientError } from "@/lib/api-client";
 import type { Settings } from "@/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
@@ -32,7 +35,7 @@ async function fileToCompressedDataUrl(file: File): Promise<string> {
   return canvas.toDataURL("image/png");
 }
 
-export function SettingsBoard() {
+export function InstitutionSettingsBoard() {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logo, setLogo] = useState<string | null>(null);
@@ -49,20 +52,16 @@ export function SettingsBoard() {
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<SettingsInput>({ resolver: zodResolver(settingsSchema) });
+  } = useForm<InstitutionSettingsInput>({ resolver: zodResolver(institutionSettingsSchema) });
 
   if (data && data !== syncedSettings) {
     setSyncedSettings(data);
-    reset({
-      institutionName: data.institutionName,
-      attendanceThreshold: data.attendanceThreshold,
-      assessmentPassMark: data.assessmentPassMark,
-    });
+    reset({ institutionName: data.institutionName });
     setLogo(data.institutionLogo);
   }
 
   const mutation = useMutation({
-    mutationFn: (values: SettingsInput) => api.patch<Settings>("/api/settings", values),
+    mutationFn: (values: InstitutionSettingsInput) => api.patch<Settings>("/api/settings", values),
     onSuccess: () => {
       toast.success("Settings saved");
       queryClient.invalidateQueries({ queryKey: ["settings"] });
@@ -102,7 +101,7 @@ export function SettingsBoard() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Settings</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          System-wide configuration used across the app and generated reports.
+          How the institution presents itself across the app and on every generated report.
         </p>
       </div>
 
@@ -174,41 +173,6 @@ export function SettingsBoard() {
                 <p className="mt-1 text-xs text-slate-400">
                   Shown in the sidebar and printed at the top of every generated PDF report.
                 </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 border-t border-slate-200 pt-4 sm:grid-cols-2 dark:border-slate-800">
-                <div>
-                  <Label htmlFor="attendanceThreshold">Minimum Attendance Threshold (%)</Label>
-                  <Input
-                    id="attendanceThreshold"
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={1}
-                    error={errors.attendanceThreshold?.message}
-                    {...register("attendanceThreshold", { valueAsNumber: true })}
-                  />
-                  <FieldError message={errors.attendanceThreshold?.message} />
-                  <p className="mt-1 text-xs text-slate-400">
-                    Attendance reports flag students below this as &quot;LOW&quot;.
-                  </p>
-                </div>
-                <div>
-                  <Label htmlFor="assessmentPassMark">Assessment Pass Mark (%)</Label>
-                  <Input
-                    id="assessmentPassMark"
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={1}
-                    error={errors.assessmentPassMark?.message}
-                    {...register("assessmentPassMark", { valueAsNumber: true })}
-                  />
-                  <FieldError message={errors.assessmentPassMark?.message} />
-                  <p className="mt-1 text-xs text-slate-400">
-                    The &quot;All Assessments&quot; report marks students at/above this PASS, below REDO.
-                  </p>
-                </div>
               </div>
 
               <div className="flex justify-end">

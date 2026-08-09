@@ -71,16 +71,13 @@ async function main() {
   }
   console.log(`Created ${modules.length} modules`);
 
-  // The admin assigns the lecturer their courses; that assignment is what makes
+  // The admin assigns the lecturer their modules; that assignment is what makes
   // the students show up for them without them registering anyone.
   await prisma.user.update({
     where: { id: lecturer.id },
-    data: {
-      courses: { set: courses.map((c) => ({ id: c.id })) },
-      modules: { set: modules.map((m) => ({ id: m.id })) },
-    },
+    data: { modules: { set: modules.map((m) => ({ id: m.id })) } },
   });
-  console.log(`Assigned ${courses.length} courses to the seeded lecturer`);
+  console.log(`Assigned ${modules.length} modules to the seeded lecturer`);
 
   let regCounter = 1;
   const students = [];

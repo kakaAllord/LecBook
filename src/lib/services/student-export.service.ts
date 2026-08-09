@@ -2,7 +2,8 @@ import dayjs from "dayjs";
 import { prisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api-response";
 import { bufferPdf, addReportHeader, drawTableRow } from "@/lib/pdf";
-import { getSettings } from "@/lib/services/settings.service";
+import { getSettingsFor } from "@/lib/services/settings.service";
+import type { Session } from "@/lib/auth";
 import { toUtcDayStart, toUtcDayEnd } from "@/lib/date";
 import type { StudentExportInput } from "@/lib/validators/export";
 
@@ -67,12 +68,13 @@ function pct(part: number, whole: number) {
  * data so the same result can be rendered as a PDF or copied as text.
  */
 export async function buildStudentExport(
+  session: Session,
   studentId: string,
   options: StudentExportInput
 ): Promise<StudentExportData> {
   const [student, settings] = await Promise.all([
     prisma.student.findUnique({ where: { id: studentId }, include: { course: true } }),
-    getSettings(),
+    getSettingsFor(session),
   ]);
   if (!student) throw new ApiError("Student not found", 404);
 

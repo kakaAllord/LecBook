@@ -28,7 +28,7 @@ export async function POST(request: Request, { params }: Params) {
     const format = searchParams.get("format") ?? "json";
     const options = studentExportSchema.parse(await request.json());
 
-    const data = await buildStudentExport(id, options);
+    const data = await buildStudentExport(session, id, options);
 
     if (format === "pdf") {
       const { pdf, filename } = await renderStudentExportPdf(data, options);

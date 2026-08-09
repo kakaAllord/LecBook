@@ -1,7 +1,10 @@
 import { requireStaffPage } from "@/lib/guard";
-import { SettingsBoard } from "./SettingsBoard";
+import { InstitutionSettingsBoard } from "./InstitutionSettingsBoard";
+import { TeachingSettingsBoard } from "./TeachingSettingsBoard";
 
 export default async function SettingsPage() {
-  await requireStaffPage();
-  return <SettingsBoard />;
+  const session = await requireStaffPage();
+  // Two different screens behind one route: the admin configures the
+  // institution, the lecturer configures their own marking bar.
+  return session.role === "ADMIN" ? <InstitutionSettingsBoard /> : <TeachingSettingsBoard />;
 }

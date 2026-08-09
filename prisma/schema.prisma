@@ -32,6 +32,10 @@ model User {
   staffId   String?
   // The admin (or super admin) who created this account.
   createdById String?
+  // A lecturer sets the bar for their own modules; null means the institution
+  // default in Settings applies.
+  attendanceThreshold Float?
+  assessmentPassMark  Float?
   lastLoginAt DateTime?
   loginCount  Int      @default(0)
   createdAt DateTime   @default(now())

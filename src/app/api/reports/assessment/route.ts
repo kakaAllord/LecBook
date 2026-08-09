@@ -1,5 +1,7 @@
 import { fail, handleApiError } from "@/lib/api-response";
 import { requireSession } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { assertModuleAccess } from "@/lib/scope";
 import { generateAssessmentReport, generateAllAssessmentsReport } from "@/lib/services/report.service";
 
 export const runtime = "nodejs";
@@ -16,18 +18,27 @@ function pdfResponse(pdf: Buffer, filename: string) {
 
 export async function GET(request: Request) {
   try {
-    await requireSession();
+    const session = await requireSession();
     const { searchParams } = new URL(request.url);
     const assessmentId = searchParams.get("assessmentId");
     const moduleId = searchParams.get("moduleId");
     const courseId = searchParams.get("courseId") ?? undefined;
 
     if (assessmentId) {
-      const { pdf, filename } = await generateAssessmentReport(assessmentId);
+      // The assessment's module decides who may download it.
+      const assessment = await prisma.assessment.findUnique({
+        where: { id: assessmentId },
+        select: { moduleId: true },
+      });
+      if (!assessment) return fail("Assessment not found", 404);
+      await assertModuleAccess(session, assessment.moduleId);
+
+      const { pdf, filename } = await generateAssessmentReport(session, assessmentId);
       return pdfResponse(pdf, filename);
     }
     if (moduleId) {
-      const { pdf, filename } = await generateAllAssessmentsReport(moduleId, courseId);
+      await assertModuleAccess(session, moduleId);
+      const { pdf, filename } = await generateAllAssessmentsReport(session, moduleId, courseId);
       return pdfResponse(pdf, filename);
     }
     return fail("assessmentId or moduleId is required", 422);

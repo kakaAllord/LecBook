@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api-response";
 import { bufferPdf, addReportHeader, drawTableRow, drawTick, drawStatusCell, drawRowGrid } from "@/lib/pdf";
 import { toUtcDayStart, toUtcDayEnd } from "@/lib/date";
-import { getSettings } from "@/lib/services/settings.service";
+import { getSettingsFor } from "@/lib/services/settings.service";
+import type { Session } from "@/lib/auth";
 
 const REG_COL_WIDTH = 65;
 const NAME_COL_WIDTH = 135;
@@ -33,10 +34,16 @@ function courseScopeLabel(scopeCourses: { name: string }[], allCourseCount: numb
   return scopeCourses.map((c) => c.name).join(", ");
 }
 
-export async function generateAttendanceReport(moduleId: string, courseId?: string, from?: string, to?: string) {
+export async function generateAttendanceReport(
+  session: Session,
+  moduleId: string,
+  courseId?: string,
+  from?: string,
+  to?: string
+) {
   const [{ module: module_, scopeCourses }, settings] = await Promise.all([
     resolveModuleScope(moduleId, courseId),
-    getSettings(),
+    getSettingsFor(session),
   ]);
 
   const scopeCourseIds = scopeCourses.map((c) => c.id);
@@ -210,13 +217,13 @@ export async function generateAttendanceReport(moduleId: string, courseId?: stri
   return { pdf, filename: `attendance-${module_.name.replace(/\s+/g, "-")}-${dayjs().format("YYYYMMDD")}.pdf` };
 }
 
-export async function generateAssessmentReport(assessmentId: string) {
+export async function generateAssessmentReport(session: Session, assessmentId: string) {
   const [assessment, settings] = await Promise.all([
     prisma.assessment.findUnique({
       where: { id: assessmentId },
       include: { module: true, courses: true },
     }),
-    getSettings(),
+    getSettingsFor(session),
   ]);
   if (!assessment) throw new ApiError("Assessment not found", 404);
 
@@ -300,10 +307,10 @@ export async function generateAssessmentReport(assessmentId: string) {
   };
 }
 
-export async function generateAllAssessmentsReport(moduleId: string, courseId?: string) {
+export async function generateAllAssessmentsReport(session: Session, moduleId: string, courseId?: string) {
   const [{ module: module_, scopeCourses }, settings] = await Promise.all([
     resolveModuleScope(moduleId, courseId),
-    getSettings(),
+    getSettingsFor(session),
   ]);
   const scopeCourseIds = scopeCourses.map((c) => c.id);
 

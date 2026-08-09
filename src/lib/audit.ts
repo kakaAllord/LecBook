@@ -35,7 +35,8 @@ export type AuditAction =
   | "assessment.delete"
   | "assessment.marks_save"
   | "report.download"
-  | "settings.update";
+  | "settings.update"
+  | "settings.teaching_update";
 
 type AuditInput = {
   action: AuditAction;
