@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { UserCog, ExternalLink, Power, PowerOff } from "lucide-react";
+import { UserCog, ExternalLink, Power, PowerOff, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiClientError } from "@/lib/api-client";
 import type { ManagedUser, Paginated, UserRole } from "@/types";
@@ -15,6 +15,8 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Pagination } from "@/components/ui/Pagination";
 import { Badge } from "@/components/ui/Badge";
+import { InviteLinkDialog } from "@/components/invite/InviteLinkDialog";
+import { AdminFormDialog } from "./AdminFormDialog";
 
 const ROLE_LABELS: Record<UserRole, string> = {
   SUPER_ADMIN: "Super Admin",
@@ -42,6 +44,8 @@ export function UsersBoard() {
   const [role, setRole] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+  const [addOpen, setAddOpen] = useState(false);
+  const [invite, setInvite] = useState<{ name: string; email: string; url: string } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-users", search, role, status, page],
@@ -68,12 +72,17 @@ export function UsersBoard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Users</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Every administrator and lecturer on the system. Open an account to see exactly what they see,
-          or switch their access on and off.
-        </p>
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Users</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Every administrator and lecturer on the system. Open an account to see exactly what they
+            see, or switch their access on and off.
+          </p>
+        </div>
+        <Button onClick={() => setAddOpen(true)}>
+          <Plus className="h-4 w-4" /> Add administrator
+        </Button>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -119,7 +128,12 @@ export function UsersBoard() {
         <EmptyState
           icon={UserCog}
           title="Nobody here yet"
-          description="Administrators and the lecturers they add will appear here."
+          description="Add an administrator to get an institution started — the lecturers they add appear here too."
+          action={
+            <Button onClick={() => setAddOpen(true)}>
+              <Plus className="h-4 w-4" /> Add administrator
+            </Button>
+          }
         />
       ) : (
         <>
@@ -209,6 +223,22 @@ export function UsersBoard() {
           <Pagination page={data.page} totalPages={data.totalPages} onPageChange={setPage} />
         </>
       )}
+
+      <AdminFormDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onInviteCreated={(admin, inviteUrl) =>
+          setInvite({ name: admin.name, email: admin.email, url: inviteUrl })
+        }
+      />
+
+      <InviteLinkDialog
+        open={Boolean(invite)}
+        onClose={() => setInvite(null)}
+        name={invite?.name ?? ""}
+        email={invite?.email ?? ""}
+        inviteUrl={invite?.url ?? ""}
+      />
     </div>
   );
 }

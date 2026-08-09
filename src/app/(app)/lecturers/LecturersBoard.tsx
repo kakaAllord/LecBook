@@ -17,7 +17,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Badge } from "@/components/ui/Badge";
 import { LecturerFormDialog } from "./LecturerFormDialog";
-import { InviteLinkDialog } from "./InviteLinkDialog";
+import { InviteLinkDialog } from "@/components/invite/InviteLinkDialog";
 
 function statusColor(status: string) {
   return status === "ACTIVE" ? "emerald" : status === "PENDING" ? "amber" : "rose";
