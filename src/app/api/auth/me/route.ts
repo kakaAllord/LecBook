@@ -17,7 +17,7 @@ export async function GET() {
         title: true,
         createdAt: true,
         lastLoginAt: true,
-        courses: { select: { id: true, name: true } },
+        modules: { select: { id: true, name: true } },
       },
     });
     return ok({

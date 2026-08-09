@@ -39,7 +39,7 @@ export async function listCourses(
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      include: { _count: { select: { students: true } }, lecturers: { select: { id: true, name: true } } },
+      include: { _count: { select: { students: true } } },
     }),
     prisma.course.count({ where }),
   ]);

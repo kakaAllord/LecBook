@@ -12,7 +12,6 @@ export const createUserSchema = z.object({
   staffId: z.string().max(50).optional().or(z.literal("")),
   // Optional rather than defaulted so the inferred input and output types match,
   // which keeps react-hook-form's resolver types happy.
-  courseIds: z.array(z.string()).optional(),
   moduleIds: z.array(z.string()).optional(),
 });
 

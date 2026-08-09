@@ -18,8 +18,7 @@ export type ManagedUser = {
   loginCount: number;
   createdAt: string;
   createdBy: { id: string; name: string; email: string } | null;
-  courses: { id: string; name: string; level: string; semester: string }[];
-  modules: { id: string; name: string; code: string | null }[];
+  modules: { id: string; name: string; code: string | null; courses: { id: string; name: string }[] }[];
   _count: { createdUsers: number; sessions: number };
 };
 
@@ -33,7 +32,7 @@ export type CurrentUser = {
   title: string | null;
   createdAt: string;
   lastLoginAt: string | null;
-  courses: { id: string; name: string }[];
+  modules: { id: string; name: string }[];
   impersonatedBy: { id: string; name: string } | null;
 };
 

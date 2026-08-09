@@ -7,7 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { createUserSchema, type CreateUserInput } from "@/lib/validators/user";
 import { api, ApiClientError } from "@/lib/api-client";
-import type { Course, ManagedUser, Module, UserRole } from "@/types";
+import type { ManagedUser, Module, UserRole } from "@/types";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input, Label, FieldError } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -30,12 +30,6 @@ export function UserFormDialog({
   const queryClient = useQueryClient();
   const isEdit = Boolean(user);
   const [role, setRole] = useState<UserRole>("LECTURER");
-
-  const { data: courses } = useQuery({
-    queryKey: ["courses", "all"],
-    queryFn: () => api.get<Course[]>("/api/courses?all=true"),
-    enabled: open,
-  });
 
   const { data: modules } = useQuery({
     queryKey: ["modules", "all"],
@@ -61,7 +55,6 @@ export function UserFormDialog({
           title: user.title ?? "",
           phone: user.phone ?? "",
           staffId: user.staffId ?? "",
-          courseIds: user.courses.map((c) => c.id),
           moduleIds: user.modules.map((m) => m.id),
         }
       : {
@@ -71,7 +64,6 @@ export function UserFormDialog({
           title: "",
           phone: "",
           staffId: "",
-          courseIds: [],
           moduleIds: [],
         };
     reset(initial);
@@ -123,8 +115,8 @@ export function UserFormDialog({
       >
         {!isEdit && (
           <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
-            You add the account and assign the courses. They receive a one-time link, fill in the rest of
-            their details, set their own password, and start using the system.
+            You enter their details and tick the modules they teach. They receive a one-time link, set
+            their own password, and start using the system.
           </p>
         )}
 
@@ -178,47 +170,25 @@ export function UserFormDialog({
         </div>
 
         {isLecturer && (
-          <div className="grid gap-4 border-t border-slate-200 pt-4 sm:grid-cols-2 dark:border-slate-800">
-            <div>
-              <Label htmlFor="courseIds">Courses they teach</Label>
-              <Controller
-                name="courseIds"
-                control={control}
-                render={({ field }) => (
-                  <CheckboxGroup
-                    options={(courses ?? []).map((c) => ({
-                      id: c.id,
-                      label: `${c.name} · ${c.level} · ${c.semester}`,
-                    }))}
-                    value={field.value ?? []}
-                    onChange={field.onChange}
-                  />
-                )}
-              />
-              <p className="mt-1 text-xs text-slate-400">
-                Every student in these courses appears in their account automatically.
-              </p>
-            </div>
-            <div>
-              <Label htmlFor="moduleIds">Modules (optional)</Label>
-              <Controller
-                name="moduleIds"
-                control={control}
-                render={({ field }) => (
-                  <CheckboxGroup
-                    options={(modules ?? []).map((m) => ({
-                      id: m.id,
-                      label: m.code ? `${m.name} (${m.code})` : m.name,
-                    }))}
-                    value={field.value ?? []}
-                    onChange={field.onChange}
-                  />
-                )}
-              />
-              <p className="mt-1 text-xs text-slate-400">
-                Leave empty to give them every module linked to their courses.
-              </p>
-            </div>
+          <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
+            <Label htmlFor="moduleIds">Modules they teach</Label>
+            <Controller
+              name="moduleIds"
+              control={control}
+              render={({ field }) => (
+                <CheckboxGroup
+                  options={(modules ?? []).map((m) => ({
+                    id: m.id,
+                    label: m.code ? `${m.name} (${m.code})` : m.name,
+                  }))}
+                  value={field.value ?? []}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Every student on a course that runs these modules appears in their account automatically.
+            </p>
           </div>
         )}
 

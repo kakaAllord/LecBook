@@ -24,8 +24,7 @@ export const userSelect = {
   loginCount: true,
   createdAt: true,
   createdBy: { select: { id: true, name: true, email: true } },
-  courses: { select: { id: true, name: true, level: true, semester: true } },
-  modules: { select: { id: true, name: true, code: true } },
+  modules: { select: { id: true, name: true, code: true, courses: { select: { id: true, name: true } } } },
   _count: { select: { createdUsers: true, sessions: true } },
 } satisfies Prisma.UserSelect;
 
@@ -128,13 +127,8 @@ export async function createUser(session: Session, data: CreateUserInput) {
     throw new ApiError("An account with this email already exists", 409);
   }
 
-  const courseIds = data.courseIds ?? [];
   const moduleIds = data.moduleIds ?? [];
 
-  if (courseIds.length > 0) {
-    const count = await prisma.course.count({ where: { id: { in: courseIds } } });
-    if (count !== courseIds.length) throw new ApiError("One or more courses do not exist", 422);
-  }
   if (moduleIds.length > 0) {
     const count = await prisma.module.count({ where: { id: { in: moduleIds } } });
     if (count !== moduleIds.length) throw new ApiError("One or more modules do not exist", 422);
@@ -152,7 +146,6 @@ export async function createUser(session: Session, data: CreateUserInput) {
       phone: data.phone || null,
       staffId: data.staffId || null,
       createdById: session.sub,
-      courses: { connect: courseIds.map((id) => ({ id })) },
       modules: { connect: moduleIds.map((id) => ({ id })) },
       invites: {
         create: {
@@ -187,7 +180,6 @@ export async function updateUser(session: Session, id: string, data: UpdateUserI
       ...(data.title !== undefined ? { title: data.title || null } : {}),
       ...(data.phone !== undefined ? { phone: data.phone || null } : {}),
       ...(data.staffId !== undefined ? { staffId: data.staffId || null } : {}),
-      ...(data.courseIds ? { courses: { set: data.courseIds.map((cid) => ({ id: cid })) } } : {}),
       ...(data.moduleIds ? { modules: { set: data.moduleIds.map((mid) => ({ id: mid })) } } : {}),
     },
     select: userSelect,
@@ -261,7 +253,6 @@ export async function getInviteByToken(token: string) {
           phone: true,
           staffId: true,
           status: true,
-          courses: { select: { id: true, name: true, level: true, semester: true } },
           modules: { select: { id: true, name: true, code: true } },
         },
       },

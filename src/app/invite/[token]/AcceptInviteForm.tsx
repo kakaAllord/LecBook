@@ -20,7 +20,6 @@ type InviteDetails = {
   title: string | null;
   phone: string | null;
   staffId: string | null;
-  courses: { id: string; name: string; level: string; semester: string }[];
   modules: { id: string; name: string; code: string | null }[];
   expiresAt: string;
 };
@@ -110,33 +109,25 @@ export function AcceptInviteForm({ token }: { token: string }) {
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Signing in as</p>
           <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">{data.email}</p>
 
-          {data.courses.length > 0 && (
+          {data.modules.length > 0 && (
             <div className="mt-4">
               <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
-                <BookOpen className="h-3.5 w-3.5" /> Courses assigned to you
+                <BookOpen className="h-3.5 w-3.5" /> Modules assigned to you
               </p>
               <ul className="space-y-1">
-                {data.courses.map((c) => (
+                {data.modules.map((m) => (
                   <li
-                    key={c.id}
+                    key={m.id}
                     className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300"
                   >
                     <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    {c.name} · {c.level} · {c.semester}
+                    {m.name}
+                    {m.code ? ` (${m.code})` : ""}
                   </li>
                 ))}
               </ul>
               <p className="mt-2 text-xs text-slate-400">
                 Their students are already registered — you&apos;ll see them as soon as you sign in.
-              </p>
-            </div>
-          )}
-
-          {data.modules.length > 0 && (
-            <div className="mt-4">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Modules</p>
-              <p className="text-sm text-slate-700 dark:text-slate-300">
-                {data.modules.map((m) => m.name + (m.code ? ` (${m.code})` : "")).join(", ")}
               </p>
             </div>
           )}

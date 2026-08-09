@@ -112,7 +112,7 @@ export function UsersBoard({ viewerRole, viewerId }: { viewerRole: UserRole; vie
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {isSuperAdmin
               ? "Every administrator and the lecturers they have added."
-              : "The lecturers you have added and the courses assigned to them."}
+              : "The lecturers you have added and the modules assigned to them."}
           </p>
         </div>
         <Button
@@ -170,7 +170,7 @@ export function UsersBoard({ viewerRole, viewerId }: { viewerRole: UserRole; vie
         <EmptyState
           icon={UserCog}
           title="Nobody here yet"
-          description="Add a lecturer, assign their courses, and send them the invite link."
+          description="Add a lecturer, assign their modules, and send them the invite link."
           action={
             <Button
               onClick={() => {
@@ -189,7 +189,7 @@ export function UsersBoard({ viewerRole, viewerId }: { viewerRole: UserRole; vie
               <TR>
                 <TH>Name</TH>
                 <TH>Role</TH>
-                <TH>Courses</TH>
+                <TH>Modules</TH>
                 {isSuperAdmin && <TH>Added by</TH>}
                 <TH>Last active</TH>
                 <TH>Status</TH>
@@ -211,8 +211,8 @@ export function UsersBoard({ viewerRole, viewerId }: { viewerRole: UserRole; vie
                   </TD>
                   <TD>
                     {user.role === "LECTURER" ? (
-                      user.courses.length > 0 ? (
-                        <span className="text-xs">{user.courses.map((c) => c.name).join(", ")}</span>
+                      user.modules.length > 0 ? (
+                        <span className="text-xs">{user.modules.map((m) => m.name).join(", ")}</span>
                       ) : (
                         <span className="text-xs text-amber-600 dark:text-amber-500">None assigned</span>
                       )

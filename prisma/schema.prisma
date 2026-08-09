@@ -40,7 +40,8 @@ model User {
   createdBy    User?  @relation("UserCreator", fields: [createdById], references: [id], onDelete: SetNull)
   createdUsers User[] @relation("UserCreator")
 
-  courses  Course[] @relation("CourseLecturers")
+  // Lecturers are assigned modules; the courses (and therefore the students)
+  // they see are derived from those modules.
   modules  Module[] @relation("ModuleLecturers")
 
   invites    Invite[]
@@ -138,7 +139,6 @@ model Course {
   students    Student[]
   modules     Module[]     @relation("ModuleCourses")
   assessments Assessment[] @relation("AssessmentCourses")
-  lecturers   User[]       @relation("CourseLecturers")
 }
 
 model Module {

@@ -17,7 +17,6 @@ export async function GET(_request: Request, { params }: Params) {
       title: invite.user.title,
       phone: invite.user.phone,
       staffId: invite.user.staffId,
-      courses: invite.user.courses,
       modules: invite.user.modules,
       expiresAt: invite.expiresAt,
     });
