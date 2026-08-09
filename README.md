@@ -17,7 +17,7 @@ A single Next.js application (frontend + backend in one project, one deploy) tha
 
 ```
 prisma/
-  schema.prisma        Data model (User, Settings, Course, Student, Attendance, AssessmentType, Assessment, AssessmentMark)
+  schema.prisma        Data model (User, Invite, UserSession, AuditLog, Settings, Course, Module, Student, Attendance, Assessment, AssessmentMark)
   seed.ts               Full seed script (lecturer login + sample courses/students/assessments/attendance)
   seed-credentials.ts    Credentials-only seed (used standalone by `npm run db:seed:creds`, and by seed.ts)
   clear.ts               Wipes everything except the User table (used by `npm run db:clear`)
@@ -26,7 +26,7 @@ scripts/
 src/
   app/
     api/                 Route Handlers = REST API (courses, students, attendance, assessments, reports, auth, dashboard)
-    (app)/               Authenticated pages (Dashboard, Courses, Students, Attendance, Assessments, Reports) with sidebar layout
+    (app)/               Authenticated pages, one navigation per role, with sidebar layout
     login/                Public login page
   components/
     ui/                   Reusable UI primitives (Button, Input, Dialog, Table, Pagination, etc.)
@@ -121,16 +121,37 @@ npm run start
 
 ## Features
 
-- **Dashboard** — totals for students, courses, today's attendance, assessments, and quick navigation.
-- **Courses** — full CRUD with search.
-- **Students** — registration with unique registration numbers, search, filter by course/status, CRUD.
-- **Attendance** — choose a course and date, mark Present/Absent/Late/Excused per student, save (upserts, so re-saving the same date edits rather than duplicates), and browse history by date range.
-- **Assessment Types** — fully dynamic, nothing hardcoded (Quiz, Test, Assignment, Practical, etc. are just data); create/edit/delete your own.
-- **Assessments & Marks** — create an assessment against a course + type, enter marks per student with automatic max-marks validation, edit later.
-- **Reports** — generate a printable PDF for attendance (by course + date range, with per-student attendance %) or for a single assessment (marks, average, highest, lowest), with the institution name in the header.
-- **Settings** — set the Institution Name shown in the sidebar and printed at the top of every PDF report; stored in the database (not an env var), so it's editable from the UI. Also the place to (re)download the Getting Started guide.
+The application is three workspaces behind one login. What you see is decided by
+the account you sign in with, not by rows greyed out in a shared menu.
+
+### Super admin — operations
+
+- **Dashboard** — how the product is actually used: returning admins, daily and monthly actives, phone/computer split, feature usage, onboarding health.
+- **Users** — every administrator and lecturer, with two actions each: open their account in a new tab exactly as they see it ("view as", read-only), or switch their access on and off.
+- **Logs** — the full activity trail in a terminal, colour-coded by action family, filterable by actor, action, and a from/to range down to the minute. Tail it live, or replay the selection forwards in time at 0.5x–4x.
+
+### Administrator — the institution's records
+
+- **Dashboard** — students, courses, modules and lecturers, plus the setup gaps still open (modules with no lecturer, courses with no students, invites not yet opened), each linking to the page that closes it.
+- **Courses / Modules** — full CRUD with search; modules are linked to the courses that run them.
+- **Students** — registration with unique registration numbers, search, filters, CRUD. Registration is the administrator's job; lecturers never register anyone.
+- **Lecturers** — add a lecturer, tick the modules they teach, and copy the one-time invite link to send them. Activate or deactivate accounts.
+- **Reports** — attendance registers, assessment sheets, and a per-student report.
+- **Settings** — institution name and logo, printed at the top of every PDF.
+
+### Lecturer — teaching
+
+- **Dashboard** — their students, their modules, whether today's register is in, attendance per module, and who has fallen below their attendance bar.
+- **Students** — read-only roll of everyone on a course that runs one of their modules.
+- **Attendance** — mark Present/Absent per student for a module and date, save (upserts, so re-saving edits rather than duplicates), and correct an already-saved session that was filed against the wrong module, date or course.
+- **Assessments & Marks** — create an assessment against a module (with the marks still available out of the module cap shown before you commit), then enter marks per student.
+- **Reports** — attendance registers with a signature column, assessment sheets, and a per-student report over any range of dates or set of assessments.
+- **Settings** — their own minimum attendance threshold and assessment pass mark, which their reports are measured against.
+
+### Everywhere
+
 - **Dark mode** — toggle in the sidebar, persisted to `localStorage`.
-- **Getting Started guide** — a PDF generated on demand (`/api/getting-started-guide`, downloadable from the Settings page) walking through every feature from login to reports, with the institution name pulled live from Settings.
+- **Getting Started guide** — a PDF generated on demand (`/api/getting-started-guide`, downloadable from Settings), with the institution name pulled live from Settings.
 
 ## Notes
 
