@@ -3,6 +3,24 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { paginatedResult } from "@/lib/pagination";
 
+/**
+ * Range bounds accept either a date or a date and time. A bare date means the
+ * whole day, which is what someone typing "the 8th" means; once a time is given
+ * it is taken literally, so a range can be narrowed to the minute an incident
+ * happened.
+ */
+function rangeStart(value: string) {
+  const parsed = dayjs(value);
+  if (!parsed.isValid()) return undefined;
+  return value.includes("T") ? parsed.toDate() : parsed.startOf("day").toDate();
+}
+
+function rangeEnd(value: string) {
+  const parsed = dayjs(value);
+  if (!parsed.isValid()) return undefined;
+  return value.includes("T") ? parsed.toDate() : parsed.endOf("day").toDate();
+}
+
 export async function listAuditLogs(opts: {
   search: string;
   userId?: string;
@@ -25,8 +43,8 @@ export async function listAuditLogs(opts: {
         ? [
             {
               createdAt: {
-                ...(from ? { gte: dayjs(from).startOf("day").toDate() } : {}),
-                ...(to ? { lte: dayjs(to).endOf("day").toDate() } : {}),
+                ...(from ? { gte: rangeStart(from) } : {}),
+                ...(to ? { lte: rangeEnd(to) } : {}),
               },
             },
           ]
