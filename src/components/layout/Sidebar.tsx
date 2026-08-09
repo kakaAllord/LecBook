@@ -17,8 +17,8 @@ import {
   Menu,
   X,
   UserCog,
+  GraduationCap,
   Terminal,
-  Activity,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -27,30 +27,63 @@ import { api } from "@/lib/api-client";
 import type { UserRole } from "@/types";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
-type NavItem = { href: string; label: string; icon: LucideIcon; roles: UserRole[] };
+type NavItem = { href: string; label: string; icon: LucideIcon };
 
-const ALL: UserRole[] = ["SUPER_ADMIN", "ADMIN", "LECTURER"];
-const ADMINS: UserRole[] = ["SUPER_ADMIN", "ADMIN"];
-const SUPER: UserRole[] = ["SUPER_ADMIN"];
+/**
+ * One navigation list per role rather than one list filtered by role. Each
+ * account signs into a workspace built for the job it does: the super admin
+ * operates the system, the admin runs the institution's records, the lecturer
+ * teaches. Nothing from another role's workspace is present to be hidden.
+ */
+const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
+  SUPER_ADMIN: [
+    { href: "/", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/admin/users", label: "Users", icon: UserCog },
+    { href: "/admin/logs", label: "Logs", icon: Terminal },
+  ],
+  ADMIN: [
+    { href: "/", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/courses", label: "Courses", icon: BookOpen },
+    { href: "/modules", label: "Modules", icon: Layers },
+    { href: "/students", label: "Students", icon: Users },
+    { href: "/lecturers", label: "Lecturers", icon: GraduationCap },
+    { href: "/reports", label: "Reports", icon: FileBarChart },
+    { href: "/settings", label: "Settings", icon: SettingsIcon },
+  ],
+  LECTURER: [
+    { href: "/", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/students", label: "Students", icon: Users },
+    { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
+    { href: "/assessments", label: "Assessments", icon: ListChecks },
+    { href: "/reports", label: "Reports", icon: FileBarChart },
+    { href: "/settings", label: "Settings", icon: SettingsIcon },
+  ],
+};
 
-const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ALL },
-  { href: "/courses", label: "Courses", icon: BookOpen, roles: ADMINS },
-  { href: "/modules", label: "Modules", icon: Layers, roles: ADMINS },
-  { href: "/students", label: "Students", icon: Users, roles: ALL },
-  { href: "/attendance", label: "Attendance", icon: ClipboardCheck, roles: ALL },
-  { href: "/assessments", label: "Assessments", icon: ListChecks, roles: ALL },
-  { href: "/reports", label: "Reports", icon: FileBarChart, roles: ALL },
-  { href: "/admin/users", label: "People", icon: UserCog, roles: ADMINS },
-  { href: "/admin/metrics", label: "Metrics", icon: Activity, roles: SUPER },
-  { href: "/admin/logs", label: "Activity Log", icon: Terminal, roles: SUPER },
-  { href: "/settings", label: "Settings", icon: SettingsIcon, roles: ADMINS },
-];
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  SUPER_ADMIN: "Super Admin",
-  ADMIN: "Administrator",
-  LECTURER: "Lecturer",
+/**
+ * Each workspace carries its own accent, so a glance at the screen — or at a
+ * screenshot in a support message — says which account it belongs to. Class
+ * names are written out in full because Tailwind only ships classes it can see.
+ */
+const ROLE_THEME: Record<UserRole, { label: string; workspace: string; active: string; chip: string }> = {
+  SUPER_ADMIN: {
+    label: "Super Admin",
+    workspace: "Operations",
+    active: "bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300",
+    chip: "text-violet-600 dark:text-violet-400",
+  },
+  ADMIN: {
+    label: "Administrator",
+    workspace: "Administration",
+    active: "bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-300",
+    chip: "text-sky-600 dark:text-sky-400",
+  },
+  LECTURER: {
+    label: "Lecturer",
+    workspace: "Teaching",
+    active: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
+    chip: "text-emerald-600 dark:text-emerald-400",
+  },
 };
 
 export function Sidebar({ userName, role }: { userName: string; role: UserRole }) {
@@ -58,6 +91,8 @@ export function Sidebar({ userName, role }: { userName: string; role: UserRole }
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  const theme = ROLE_THEME[role];
 
   const { data: settings } = useQuery({
     queryKey: ["settings"],
@@ -88,11 +123,9 @@ export function Sidebar({ userName, role }: { userName: string; role: UserRole }
     }
   }
 
-  const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
-
   const nav = (
     <nav className="flex-1 space-y-1 px-3 py-4">
-      {visibleItems.map((item) => {
+      {NAV_BY_ROLE[role].map((item) => {
         const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
         const Icon = item.icon;
         return (
@@ -103,7 +136,7 @@ export function Sidebar({ userName, role }: { userName: string; role: UserRole }
             className={cn(
               "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
               active
-                ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400"
+                ? theme.active
                 : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
             )}
           >
@@ -121,6 +154,7 @@ export function Sidebar({ userName, role }: { userName: string; role: UserRole }
         <div className="flex items-center gap-2 font-semibold text-slate-900 dark:text-slate-100">
           {brandMark}
           LRMS
+          <span className={cn("text-xs font-medium", theme.chip)}>{theme.workspace}</span>
         </div>
         <button
           onClick={() => setMobileOpen((v) => !v)}
@@ -143,6 +177,9 @@ export function Sidebar({ userName, role }: { userName: string; role: UserRole }
             {brandMark}
             LRMS
           </div>
+          <p className={cn("text-xs font-medium uppercase tracking-wide", theme.chip)}>
+            {theme.workspace}
+          </p>
           {settings?.institutionName && (
             <p className="truncate text-xs text-slate-400">{settings.institutionName}</p>
           )}
@@ -151,7 +188,7 @@ export function Sidebar({ userName, role }: { userName: string; role: UserRole }
         <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 dark:border-slate-800">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{userName}</p>
-            <p className="text-xs text-slate-400">{ROLE_LABELS[role]}</p>
+            <p className="text-xs text-slate-400">{theme.label}</p>
           </div>
           <div className="flex items-center gap-1">
             <ThemeToggle />
