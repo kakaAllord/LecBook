@@ -105,12 +105,17 @@ npm run build
 npm run start
 ```
 
+`build` regenerates the Prisma client before compiling. The client is generated
+code inside `node_modules`, so a host that restores `node_modules` from a build
+cache would otherwise type-check against whichever schema was current when that
+cache was written, and fail on fields added since.
+
 ## Available Scripts
 
 | Script | Description |
 | --- | --- |
 | `npm run dev` | Start the dev server |
-| `npm run build` | Production build (type-checks + lints) |
+| `npm run build` | Production build (regenerates the Prisma client, then type-checks + lints) |
 | `npm run start` | Run the production build |
 | `npm run lint` | Run ESLint |
 | `npm run db:migrate` | Run Prisma migrations |
