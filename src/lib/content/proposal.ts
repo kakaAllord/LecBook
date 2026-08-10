@@ -95,8 +95,8 @@ export const PROPOSAL: Proposal = {
           items: [
             "One place to register students, define courses and modules, and add lecturers.",
             "Lecturers are onboarded by sending a one-time link — no shared passwords, and no administrator ever knows a lecturer's password. The administrator account itself is created the same way.",
-            "Accounts can be deactivated the moment someone leaves, cutting off access immediately.",
-            "Attendance and assessment reports for any module, course or date range, as printable PDFs.",
+            "Accounts can be deactivated the moment someone leaves, preventing that account from signing in again unless it is reactivated.",
+            "Printable attendance reports for any module, optional course and date range, plus assessment reports for one assessment or all assessments in a module.",
             "A complete record of any individual student — attendance per module, marks per assessment — filtered to whatever range is needed and exported as a PDF or copied as text.",
           ],
         },
@@ -106,7 +106,7 @@ export const PROPOSAL: Proposal = {
           items: [
             "Administrators own the records: courses, modules, students, and the lecturer accounts. They do not take registers.",
             "Lecturers own the teaching: registers, marks, their own reports and their own thresholds. They see only the students on courses that run their modules, and cannot edit a student record.",
-            "We hold one operations account for support: it can read any account's screen, switch access on or off, and read the activity log — and it cannot change a college's records while doing so.",
+            "We hold one operations account for support: it can open any account's screen in a workspace labelled read-only, switch account status on or off, and read the activity log.",
           ],
         },
         { type: "subheading", text: "For the institution" },
@@ -114,9 +114,9 @@ export const PROPOSAL: Proposal = {
           type: "bullets",
           items: [
             "Evidence for regulator and audit requirements, produced on demand rather than reconstructed.",
-            "A full activity trail: every record change is attributed to a person, with a timestamp, and can be replayed in the order it happened.",
+            "A searchable activity trail for recorded system actions, attributed to a person and timestamped, with the selected entries replayed in the order they happened.",
             "Early sight of students below the attendance threshold, while there is still time to act.",
-            "The college name and logo on every report it issues, with each lecturer setting the attendance threshold and pass mark for the modules they teach.",
+            "The college name and logo on every report it issues, with each lecturer setting their own attendance threshold and pass mark across the modules they teach.",
           ],
         },
       ],

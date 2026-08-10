@@ -1,6 +1,6 @@
 # LRMS — Lecturer Record Management System
 
-A single Next.js application (frontend + backend in one project, one deploy) that replaces a lecturer's paper record book with a digital system for student registration, attendance tracking, continuous assessment, and PDF reporting.
+A single Next.js application (frontend + backend in one project, one deploy) for operating one institution's student registration, module-based teaching, attendance, continuous assessment, account oversight, and PDF reporting.
 
 ## Tech Stack
 
@@ -9,7 +9,7 @@ A single Next.js application (frontend + backend in one project, one deploy) tha
 - **Data fetching:** TanStack Query
 - **Forms & validation:** React Hook Form + Zod (client and server side)
 - **Database:** Prisma ORM on PostgreSQL. Prisma's datasource `provider` is fixed at build time (it's not inferred from the URL scheme), so switching databases means editing `prisma/schema.prisma` too, not just `DATABASE_URL`
-- **Auth:** Single-lecturer login, JWT stored in an httpOnly cookie, protected routes via `middleware.ts`
+- **Auth:** One login page for super admins, administrators and lecturers; JWT stored in an httpOnly cookie, with route entry handled by `src/middleware.ts` and role/data access enforced by server pages and API handlers
 - **PDF reports:** PDFKit
 - **Dates:** Day.js
 
@@ -18,11 +18,12 @@ A single Next.js application (frontend + backend in one project, one deploy) tha
 ```
 prisma/
   schema.prisma        Data model (User, Invite, UserSession, AuditLog, Settings, Course, Module, Student, Attendance, Assessment, AssessmentMark)
-  seed.ts               Full seed script (lecturer login + sample courses/students/assessments/attendance)
+  seed.ts               Full seed script (all three account roles + sample courses/modules/students/assessments/attendance)
   seed-credentials.ts    Credentials-only seed (used standalone by `npm run db:seed:creds`, and by seed.ts)
-  clear.ts               Wipes everything except the User table (used by `npm run db:clear`)
+  clear.ts               Wipes academic/demo data while retaining accounts and operational history (used by `npm run db:clear`)
 scripts/
   generate-getting-started-pdf.ts   Optional offline CLI to write the guide to public/getting-started-guide.pdf (used by `npm run docs:guide`); the app itself serves it dynamically from src/app/api/getting-started-guide
+  generate-proposal-pdf.ts          Offline CLI to write the business proposal to the repository root (used by `npm run docs:proposal`); the super-admin dashboard also serves it dynamically from src/app/api/proposal
 src/
   app/
     api/                 Route Handlers = REST API (courses, students, attendance, assessments, reports, auth, dashboard)
@@ -84,9 +85,10 @@ password that is public in git history.
 
 Your own local logins are recorded in `CREDENTIALS.local.md`, which is untracked.
 
-There is no in-app way to change credentials by design — re-run `db:seed:creds`
-after editing `.env`, or have the person reset their own password through an
-invite link.
+There is no in-app password-change or password-reset screen. Re-running
+`db:seed:creds` after editing `.env` resets the three seeded accounts. Invite
+links are only for new, not-yet-active accounts; an active account cannot use
+the invite flow as a password reset.
 
 ### 4. Run the app
 
@@ -116,42 +118,46 @@ npm run start
 | `npm run db:seed:creds` | Seed (or update) the super admin, administrator and lecturer logins — no demo data |
 | `npm run db:seed:all` | Alias for `npm run db:seed` |
 | `npm run db:studio` | Open Prisma Studio to inspect the database |
-| `npm run db:clear` | **Destructive.** Wipes courses, modules, students, attendance, assessments, marks and settings — leaves only the `User` table (login credentials) intact. Use this to reset a demo/training environment back to a blank slate without losing the login. |
+| `npm run db:clear` | **Destructive.** Wipes courses, modules, students, attendance, assessments, marks and settings. User accounts remain, along with their invite, session and audit-log records. Use this to reset the academic demo data without losing logins. |
 | `npm run docs:guide` | Optional: writes a static copy to `public/getting-started-guide.pdf` covering all three roles (optionally pass an institution name, e.g. `npm run docs:guide -- "My College"`). Not used by the app — Settings links to `/api/getting-started-guide`, which generates a role-specific one live. |
+| `npm run docs:proposal` | Writes the business proposal PDF to the repository root. The super-admin dashboard links to `/api/proposal`, which generates the same document on demand. |
 
 ## Features
 
-The application is three workspaces behind one login. What you see is decided by
-the account you sign in with, not by rows greyed out in a shared menu.
+The application is three workspaces behind one login page. What you see is
+decided by the account you sign in with, not by rows greyed out in a shared
+menu. Academic data and institution settings belong to the deployment as a
+whole; the current data model does not partition several colleges inside one
+database.
 
 ### Super admin — operations
 
 - **Dashboard** — how the product is actually used: returning admins, daily and monthly actives, phone/computer split, feature usage, onboarding health.
-- **Users** — every administrator and lecturer. "Add administrator" creates the account that runs an institution and hands back a one-time invite link; each row then offers two actions: open that account in a new tab exactly as its owner sees it ("view as", read-only), or switch their access on and off.
-- **Logs** — the full activity trail in a terminal, colour-coded by action family, filterable by actor, action, and a from/to range down to the minute. Tail it live, or replay the selection forwards in time at 0.5x–4x.
+- **Users** — every administrator and lecturer. "Add administrator" creates an institution administrator and hands back a one-time invite link; each active row can be opened in a new tab exactly as its owner sees it (a view-as workspace labelled read-only), and every row can have its account status switched on or off.
+- **Logs** — recorded system activity in a terminal, colour-coded by action family, filterable by free text, actor, action, and a from/to range down to the minute. Tail it live, expand an entry for its metadata, or replay the current page forwards in time at 0.5x–4x.
 
 ### Administrator — the institution's records
 
-- **Dashboard** — students, courses, modules and lecturers, plus the setup gaps still open (modules with no lecturer, courses with no students, invites not yet opened), each linking to the page that closes it.
+- **Dashboard** — students, courses, modules and lecturers, plus the setup gaps still open (modules with no lecturer, courses with no modules or students, invites not yet opened), each linking to the page that closes it.
 - **Courses / Modules** — full CRUD with search; modules are linked to the courses that run them.
-- **Students** — registration with unique registration numbers, search, filters, CRUD. Registration is the administrator's job; lecturers never register anyone.
-- **Lecturers** — add a lecturer, tick the modules they teach, and copy the one-time invite link to send them. Activate or deactivate accounts.
+- **Students** — registration with unique registration numbers, search, filters and CRUD, plus configurable per-student PDF/text exports. Registration is the administrator's job; lecturers never register anyone.
+- **Lecturers** — add a lecturer, tick the modules they teach, and copy the one-time invite link to send them. Edit assignments, issue a replacement invite while setup is pending, activate/deactivate access, or delete the account.
 - **Reports** — attendance registers, assessment sheets, and a per-student report.
-- **Settings** — institution name and logo, printed at the top of every PDF.
+- **Settings** — institution name and logo, shown in the app and printed at the top of academic report PDFs.
 
 ### Lecturer — teaching
 
 - **Dashboard** — their students, their modules, whether today's register is in, attendance per module, and who has fallen below their attendance bar.
 - **Students** — read-only roll of everyone on a course that runs one of their modules.
-- **Attendance** — mark Present/Absent per student for a module and date, save (upserts, so re-saving edits rather than duplicates), and correct an already-saved session that was filed against the wrong module, date or course.
-- **Assessments & Marks** — create an assessment against a module (with the marks still available out of the module cap shown before you commit), then enter marks per student.
+- **Attendance** — select a module, the attending course(s) and a date; mark each active student Present/Absent; save (upserts, so re-saving edits rather than duplicates); then edit, move or delete an already-saved session from its history.
+- **Assessments & Marks** — create an assessment against a module and one or more of its courses (with the marks still available out of the module's shared 60-mark cap shown before you commit), then enter or revisit marks per student.
 - **Reports** — attendance registers with a signature column, assessment sheets, and a per-student report over any range of dates or set of assessments.
 - **Settings** — their own minimum attendance threshold and assessment pass mark, which their reports are measured against.
 
 ### Everywhere
 
 - **Dark mode** — toggle in the sidebar, persisted to `localStorage`.
-- **Getting Started guide** — a PDF generated on demand (`/api/getting-started-guide`, downloadable from Settings), written for the role of whoever asks for it, with the institution name pulled live from Settings.
+- **Getting Started guide** — a PDF generated on demand (`/api/getting-started-guide`; linked from administrator and lecturer Settings), written for the role of whoever asks for it, with the institution name pulled live from Settings. The offline script produces one combined guide for all roles.
 
 ## Keeping the documents honest
 
@@ -171,6 +177,6 @@ rule.
 
 ## Notes
 
-- All API responses use a consistent envelope: `{ success: true, data }` or `{ success: false, message }`.
+- JSON API responses use a consistent envelope: `{ success: true, data }` or `{ success: false, message }`. PDF-download endpoints return `application/pdf`, and the view-as endpoint redirects into the selected workspace.
 - Client and server both validate input with the same Zod schemas.
 - `pdfkit` is registered under `serverExternalPackages` in `next.config.ts` — required so its bundled font files resolve correctly at runtime; do not remove this without re-testing report generation.

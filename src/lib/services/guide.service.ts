@@ -57,18 +57,18 @@ const SECTIONS: Section[] = [
     roles: ["SUPER_ADMIN"],
     steps: [
       "Search by name, email or staff ID, and filter by role or status.",
-      '"Add administrator" creates the account that runs an institution: fill in their details and you are handed a one-time invite link to send them. It expires in 14 days.',
-      "The open-in-new-tab icon signs you into that account's view read-only — you see exactly what they see, with a banner at the top to return to your own account. Nothing can be changed while viewing as someone else.",
-      "The power icon activates or deactivates an account. Deactivating also ends any session they currently have open.",
+      '"Add administrator" creates an administrator account for this deployment: fill in their details and you are handed a one-time invite link to send them. It expires in 14 days.',
+      "The open-in-new-tab icon signs you into that account's view — you see exactly what they see, with a read-only banner at the top and a button to return to your own account.",
+      "The power icon activates or deactivates an account. A deactivated account cannot sign in again unless it is reactivated.",
       "Courses, students and lecturers are not created here: they belong to the administrator's own workspace.",
     ],
   },
   {
     title: "4. Logs",
-    intro: "Every action taken in the system, by whom, and when.",
+    intro: "Recorded system activity, showing who did it and when.",
     roles: ["SUPER_ADMIN"],
     steps: [
-      "Entries are colour-coded by action family — accounts, students, attendance, assessments, reports, settings.",
+      "Entries are colour-coded by action family — including authentication, accounts, courses, modules, students, attendance, settings and student exports.",
       "Click any line to expand it: the actor, the exact action, the record it touched, the IP address and the browser.",
       "Filter by actor, by action (or a whole family), by free text, and by a From/To range that accepts a date and a time.",
       '"Live tail" keeps the newest page refreshing on its own; pause it when you want to read.',
@@ -97,7 +97,7 @@ const SECTIONS: Section[] = [
       'Open Courses and click "New Course": Name, Level, Semester and Academic Year (e.g. Electrical Engineering, Level 5, Semester II, 2026).',
       'Open Modules and click "New Module": a name, an optional code, and the courses that run it. One module can be shared by several courses.',
       "Use the search bar to find a record, or the pencil and trash icons on a row to edit or delete it.",
-      "A course or module with records already attached cannot be deleted until those are removed.",
+      "Deleting a course or module asks for confirmation first. Keep records that still matter rather than deleting their parent course or module.",
     ],
   },
   {
@@ -180,9 +180,9 @@ const SECTIONS: Section[] = [
     roles: ["ADMIN", "LECTURER"],
     steps: [
       'Attendance Report: choose a module, optionally one course and a date range, then "Download PDF" — a tick-sheet register, one row per student and one column per date, with totals, percentages and a signature column.',
-      'Assessment Report: choose a module and either one assessment or all of them, then "Download PDF" — marks per student with average, highest and lowest, and a signature column.',
+      'Assessment Report: choose a module and either one assessment or all of them, then "Download PDF". A single-assessment sheet includes average, highest and lowest; the all-assessments summary combines each student\'s scores. Both include a signature column.',
       "Student Report: search for one student, then ask for either their attendance (any modules, any date range) or their marks (any modules, any assessments). Leaving a selection empty means all of it.",
-      "Every report is headed with the Institution Name and logo set by the administrator.",
+      "Every academic report is headed with the Institution Name and logo set by the administrator.",
     ],
   },
   {
@@ -190,10 +190,10 @@ const SECTIONS: Section[] = [
     intro: "How the institution presents itself.",
     roles: ["ADMIN"],
     steps: [
-      "Set the Institution Name — it appears in the sidebar and at the top of every generated PDF.",
+      "Set the Institution Name — it appears in the sidebar and at the top of every academic report PDF.",
       "Upload an Institution Logo; it is resized automatically and printed on reports alongside the name.",
       "This is also where you can re-download this guide at any time.",
-      "Attendance thresholds and pass marks are not set here: each lecturer sets their own, for the modules they teach.",
+      "Attendance thresholds and pass marks are not set here: each lecturer sets one pair of their own values, applied across the modules they teach.",
     ],
   },
   {
@@ -211,7 +211,7 @@ const SECTIONS: Section[] = [
     title: "Tips",
     steps: [
       "Toggle dark mode any time with the sun/moon icon at the bottom of the sidebar — your choice is remembered.",
-      "Every list has a search bar and, where useful, filters and pagination.",
+      "Lists provide search, filters and pagination where they are useful for the records on that page.",
       "Deleting anything always asks for confirmation first, so accidental clicks are safe.",
       "Typing a number and then scrolling the page will not change the number — marks stay exactly as you entered them.",
     ],
