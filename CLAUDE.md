@@ -2,6 +2,28 @@
 
 `AGENTS.md` and `CLAUDE.md` are kept identical — edit one, copy it to the other.
 
+## The database is live
+
+**`DATABASE_URL` points at the production database. It holds a real
+institution's students, their attendance and their marks, and there is no
+separate development copy. Anything you run against it, people feel.**
+
+Read from it as much as you like — queries, reports, throwaway scripts that only
+select. Writing to it is a different thing: do it only when the change you were
+asked for is the change being written, and never as a way of trying something
+out. These four are the ones that bite:
+
+| Command | What it does to real records |
+| --- | --- |
+| `npm run db:seed` / `db:seed:all` | Inserts demo courses, students, assessments and attendance alongside the real ones |
+| `npm run db:seed:creds` | Upserts the three demo accounts **by email**, overwriting the password of any live account that shares one — it locks people out |
+| `npm run db:clear` | **Wipes** courses, modules, students, attendance, assessments, marks and settings |
+| `npm run db:migrate` | Alters the live schema; `prisma migrate reset` drops the data with it |
+
+To exercise a change end to end, point `DATABASE_URL` at a scratch database of
+your own first. When a schema change genuinely has to reach production, say so
+and wait to be told to run it rather than assuming the answer.
+
 ## The standing rule: documents must describe the real system
 
 **Before every commit, check the documents that describe this system against
