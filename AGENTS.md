@@ -75,7 +75,10 @@ Load-bearing facts, each of which a document has got wrong before:
 - The attendance threshold and pass mark live **on the lecturer**, falling back
   to the institution defaults in `Settings` (`getSettingsFor`).
 - Attendance is **Present or Absent**. There is no Late and no Excused.
-- Assessments belong to a **module** and share a 60-mark cap per module.
+- Assessments belong to a **module**, and each is marked out of its own total
+  (100 by default). There is no shared per-module cap. A student's result is the
+  **average of the percentages** they scored, over the assessments that carry a
+  mark, and passing means that average reaching the pass mark (`src/lib/grading.ts`).
 - An invited person only ever chooses a password; the administrator entered
   everything else.
 - Page access is enforced server-side in `src/lib/guard.ts`. A hidden link is

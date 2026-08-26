@@ -1,7 +1,6 @@
 import dayjs from "dayjs";
 import { prisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api-response";
-import { MODULE_MARKS_CAP } from "@/lib/validators/assessment";
 import type { AssessmentInput, SaveMarksInput } from "@/lib/validators/assessment";
 
 function normalizeDate(date: string) {
@@ -25,18 +24,6 @@ export async function listAssessments(moduleId?: string, courseId?: string) {
   });
 }
 
-export async function getRemainingMarks(moduleId: string) {
-  const module_ = await prisma.module.findUnique({ where: { id: moduleId } });
-  if (!module_) throw new ApiError("Module not found", 404);
-
-  const result = await prisma.assessment.aggregate({
-    where: { moduleId },
-    _sum: { maxMarks: true },
-  });
-  const used = result._sum.maxMarks ?? 0;
-  return { cap: MODULE_MARKS_CAP, used, remaining: Math.max(0, MODULE_MARKS_CAP - used) };
-}
-
 export async function createAssessment(data: AssessmentInput) {
   const module_ = await prisma.module.findUnique({
     where: { id: data.moduleId },
@@ -50,14 +37,8 @@ export async function createAssessment(data: AssessmentInput) {
     throw new ApiError("One or more selected courses are not linked to this module", 422);
   }
 
-  const { used, remaining } = await getRemainingMarks(data.moduleId);
-  if (data.maxMarks > remaining) {
-    throw new ApiError(
-      `Marks exceed what's available for this module: ${remaining} of ${MODULE_MARKS_CAP} remaining (${used} already allocated).`,
-      422
-    );
-  }
-
+  // No module-wide allowance to check against: an assessment is marked out of
+  // its own total, and the module's result is the average of those scores.
   return prisma.assessment.create({
     data: {
       moduleId: data.moduleId,

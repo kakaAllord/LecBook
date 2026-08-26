@@ -153,7 +153,7 @@ export function LecturerDashboard({ firstName }: { firstName: string }) {
                         {assessment.name}
                       </p>
                       <p className="text-xs text-slate-400">
-                        {assessment.moduleName} · {dayjs(assessment.date).format("DD MMM YYYY")} · max{" "}
+                        {assessment.moduleName} · {dayjs(assessment.date).format("DD MMM YYYY")} · out of{" "}
                         {assessment.maxMarks}
                       </p>
                     </div>

@@ -2,6 +2,7 @@ import dayjs from "dayjs";
 import { prisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api-response";
 import { bufferPdf, addReportHeader, drawTableRow } from "@/lib/pdf";
+import { computeStanding, passes, roundPercentage } from "@/lib/grading";
 import { getSettingsFor } from "@/lib/services/settings.service";
 import type { Session } from "@/lib/auth";
 import { toUtcDayStart, toUtcDayEnd } from "@/lib/date";
@@ -44,17 +45,19 @@ export type StudentExportData = {
     modules: {
       module: string;
       items: { name: string; date: string; marks: number | null; maxMarks: number; remarks: string | null }[];
-      obtained: number;
-      possible: number;
-      percentage: number;
+      /** Mean of the percentages scored on the assessments that carry a mark. */
+      average: number;
+      graded: number;
+      total: number;
+      /** False while nothing in the module is marked, so no verdict is shown. */
+      passes: boolean;
     }[];
     overall: {
-      obtained: number;
-      possible: number;
-      percentage: number;
+      average: number;
+      /** Zero when nothing has been marked, so no verdict is shown. */
+      graded: number;
+      total: number;
       passes: boolean;
-      /** False when nothing has been marked, so no verdict is shown. */
-      graded: boolean;
     };
   };
   thresholds: { attendance: number; passMark: number };
@@ -189,9 +192,13 @@ export async function buildStudentExport(
       byModule.get(key)!.push(assessment);
     }
 
+    const scoreOf = (a: (typeof assessments)[number]) => ({
+      marks: a.marks[0]?.marks ?? null,
+      maxMarks: a.maxMarks,
+    });
+
     const modules = Array.from(byModule.entries()).map(([module, items]) => {
-      const obtained = items.reduce((sum, a) => sum + (a.marks[0]?.marks ?? 0), 0);
-      const possible = items.reduce((sum, a) => sum + a.maxMarks, 0);
+      const standing = computeStanding(items.map(scoreOf));
       return {
         module,
         items: items.map((a) => ({
@@ -201,25 +208,23 @@ export async function buildStudentExport(
           maxMarks: a.maxMarks,
           remarks: a.marks[0]?.remarks ?? null,
         })),
-        obtained,
-        possible,
-        percentage: pct(obtained, possible),
+        average: roundPercentage(standing.average),
+        graded: standing.graded,
+        total: standing.total,
+        passes: passes(standing, settings.assessmentPassMark),
       };
     });
 
-    const obtained = modules.reduce((sum, m) => sum + m.obtained, 0);
-    const possible = modules.reduce((sum, m) => sum + m.possible, 0);
-    const percentage = pct(obtained, possible);
+    // Averaged across every assessment in scope rather than across the module
+    // averages, so a module with more assessments carries proportionate weight.
+    const overall = computeStanding(Array.from(byModule.values()).flat().map(scoreOf));
     data.assessments = {
       modules,
       overall: {
-        obtained,
-        possible,
-        percentage,
-        // With nothing marked there is no verdict to give — calling a student
-        // with zero assessments a "REDO" reads as a failing grade they never sat.
-        passes: possible > 0 && percentage >= settings.assessmentPassMark,
-        graded: possible > 0,
+        average: roundPercentage(overall.average),
+        graded: overall.graded,
+        total: overall.total,
+        passes: passes(overall, settings.assessmentPassMark),
       },
     };
   }
@@ -271,7 +276,11 @@ export function renderStudentExportText(data: StudentExportData, options: Studen
   if (data.assessments) {
     lines.push("ASSESSMENTS", "");
     for (const m of data.assessments.modules) {
-      lines.push(`  ${m.module} — ${m.obtained}/${m.possible} (${m.percentage}%)`);
+      lines.push(
+        m.graded > 0
+          ? `  ${m.module} — average ${m.average}% over ${m.graded} of ${m.total} assessment${m.total === 1 ? "" : "s"} — ${m.passes ? "PASS" : "REDO"}`
+          : `  ${m.module} — nothing marked yet`
+      );
       for (const item of m.items) {
         const score = item.marks === null ? "not marked" : `${item.marks}/${item.maxMarks}`;
         lines.push(`      ${item.name} (${item.date}): ${score}${item.remarks ? ` — ${item.remarks}` : ""}`);
@@ -280,8 +289,8 @@ export function renderStudentExportText(data: StudentExportData, options: Studen
     if (data.assessments.modules.length === 0) lines.push("  No assessments recorded for this selection.");
     lines.push(
       "",
-      data.assessments.overall.graded
-        ? `  OVERALL: ${data.assessments.overall.obtained}/${data.assessments.overall.possible} (${data.assessments.overall.percentage}%) — ${data.assessments.overall.passes ? "PASS" : "REDO"}`
+      data.assessments.overall.graded > 0
+        ? `  OVERALL: average ${data.assessments.overall.average}% over ${data.assessments.overall.graded} of ${data.assessments.overall.total} assessments — ${data.assessments.overall.passes ? "PASS" : "REDO"}`
         : "  OVERALL: nothing marked yet",
       ""
     );
@@ -296,8 +305,8 @@ export function renderStudentExportText(data: StudentExportData, options: Studen
     }
     if (data.assessments) {
       lines.push(
-        data.assessments.overall.graded
-          ? `  Assessment ${data.assessments.overall.percentage}% (pass mark ${data.thresholds.passMark}%)`
+        data.assessments.overall.graded > 0
+          ? `  Assessment average ${data.assessments.overall.average}% (pass mark ${data.thresholds.passMark}%)`
           : "  Assessment: none marked for this selection"
       );
     }
@@ -412,8 +421,12 @@ export async function renderStudentExportPdf(data: StudentExportData, options: S
           doc,
           [
             { text: m.module, width: 240, ellipsis: true },
-            { text: `${m.obtained} / ${m.possible}`, width: 130, align: "right" },
-            { text: `${m.percentage}%`, width: 145, align: "right" },
+            { text: `${m.graded} / ${m.total} marked`, width: 130, align: "right" },
+            {
+              text: m.graded > 0 ? `average ${m.average}% · ${m.passes ? "PASS" : "REDO"}` : "nothing marked yet",
+              width: 145,
+              align: "right",
+            },
           ],
           { bold: true }
         );
@@ -445,14 +458,15 @@ export async function renderStudentExportPdf(data: StudentExportData, options: S
           [
             { text: "OVERALL", width: 240 },
             {
-              text: `${data.assessments.overall.obtained} / ${data.assessments.overall.possible}`,
+              text: `${data.assessments.overall.graded} / ${data.assessments.overall.total} marked`,
               width: 130,
               align: "right",
             },
             {
-              text: data.assessments.overall.graded
-                ? `${data.assessments.overall.percentage}% · ${data.assessments.overall.passes ? "PASS" : "REDO"}`
-                : "nothing marked yet",
+              text:
+                data.assessments.overall.graded > 0
+                  ? `average ${data.assessments.overall.average}% · ${data.assessments.overall.passes ? "PASS" : "REDO"}`
+                  : "nothing marked yet",
               width: 145,
               align: "right",
             },
@@ -473,8 +487,8 @@ export async function renderStudentExportPdf(data: StudentExportData, options: S
       }
       if (data.assessments) {
         doc.text(
-          data.assessments.overall.graded
-            ? `Assessments: ${data.assessments.overall.percentage}% against a ${data.thresholds.passMark}% pass mark.`
+          data.assessments.overall.graded > 0
+            ? `Assessments: an average of ${data.assessments.overall.average}% across ${data.assessments.overall.graded} marked assessment${data.assessments.overall.graded === 1 ? "" : "s"}, against a ${data.thresholds.passMark}% pass mark.`
             : "Assessments: none marked for this selection."
         );
       }

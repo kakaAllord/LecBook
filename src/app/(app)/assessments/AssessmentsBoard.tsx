@@ -124,7 +124,7 @@ export function AssessmentsBoard() {
                   <Link href={`/assessments/${assessment.id}`} className="font-medium text-indigo-600 hover:underline">
                     {assessment.name}
                   </Link>{" "}
-                  <span className="text-xs text-slate-400">(max {assessment.maxMarks})</span>
+                  <span className="text-xs text-slate-400">(out of {assessment.maxMarks})</span>
                 </TD>
                 <TD>{assessment.module.name}</TD>
                 <TD>{assessment.courses.map((c) => c.name).join(", ")}</TD>

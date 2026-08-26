@@ -8,6 +8,7 @@ import dayjs from "dayjs";
 import { ArrowLeft, Save, Download } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiClientError } from "@/lib/api-client";
+import { scorePercentage } from "@/lib/grading";
 import type { AssessmentDetail } from "@/types";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -124,7 +125,7 @@ export function MarksBoard() {
             <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{data.assessment.name}</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
               {data.assessment.module.name} · {data.assessment.courses.map((c) => c.name).join(", ")} ·{" "}
-              {dayjs(data.assessment.date).format("DD MMM YYYY")} · Max {maxMarks} marks
+              {dayjs(data.assessment.date).format("DD MMM YYYY")} · marked out of {maxMarks}
             </p>
           </div>
           <a href={`/api/reports/assessment?assessmentId=${assessmentId}`} target="_blank" rel="noreferrer">
@@ -144,7 +145,14 @@ export function MarksBoard() {
             </div>
             <div>
               <p className="text-slate-500 dark:text-slate-400">Average</p>
-              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{stats.average.toFixed(1)}</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                {stats.average.toFixed(1)}
+                {maxMarks > 0 && (
+                  <span className="ml-1 text-sm font-normal text-slate-400">
+                    ({scorePercentage(stats.average, maxMarks).toFixed(0)}%)
+                  </span>
+                )}
+              </p>
             </div>
             <div>
               <p className="text-slate-500 dark:text-slate-400">Highest</p>

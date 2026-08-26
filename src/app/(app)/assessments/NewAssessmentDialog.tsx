@@ -7,9 +7,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import { toast } from "sonner";
-import { assessmentSchema, type AssessmentInput, type AssessmentFormInput } from "@/lib/validators/assessment";
+import {
+  assessmentSchema,
+  DEFAULT_MAX_MARKS,
+  type AssessmentInput,
+  type AssessmentFormInput,
+} from "@/lib/validators/assessment";
 import { api, ApiClientError } from "@/lib/api-client";
-import type { Assessment, Module, RemainingMarks } from "@/types";
+import type { Assessment, Module } from "@/types";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input, Label, FieldError } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -27,12 +32,6 @@ export function NewAssessmentDialog({ open, onClose }: { open: boolean; onClose:
     enabled: open,
   });
 
-  const { data: remaining } = useQuery({
-    queryKey: ["assessments", "remaining-marks", moduleId],
-    queryFn: () => api.get<RemainingMarks>(`/api/assessments/remaining-marks?moduleId=${moduleId}`),
-    enabled: open && Boolean(moduleId),
-  });
-
   const selectedModule = modules?.find((m) => m.id === moduleId);
 
   const {
@@ -48,7 +47,13 @@ export function NewAssessmentDialog({ open, onClose }: { open: boolean; onClose:
   useEffect(() => {
     if (open) {
       setModuleId("");
-      reset({ moduleId: "", courseIds: [], name: "", maxMarks: undefined, date: dayjs().format("YYYY-MM-DD") });
+      reset({
+        moduleId: "",
+        courseIds: [],
+        name: "",
+        maxMarks: DEFAULT_MAX_MARKS,
+        date: dayjs().format("YYYY-MM-DD"),
+      });
     }
   }, [open, reset]);
 
@@ -85,12 +90,6 @@ export function NewAssessmentDialog({ open, onClose }: { open: boolean; onClose:
             ))}
           </Select>
           <FieldError message={errors.moduleId?.message} />
-          {moduleId && remaining && (
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {remaining.remaining} of {remaining.cap} marks remaining for this module ({remaining.used} already
-              allocated)
-            </p>
-          )}
         </div>
 
         <div>
@@ -119,18 +118,22 @@ export function NewAssessmentDialog({ open, onClose }: { open: boolean; onClose:
         </div>
 
         <div>
-          <Label htmlFor="maxMarks">Marks</Label>
+          <Label htmlFor="maxMarks">Marked out of</Label>
           <Input
             id="maxMarks"
             type="number"
             step="0.5"
             min={0}
-            max={remaining?.remaining}
-            placeholder="10"
+            max={1000}
+            placeholder={String(DEFAULT_MAX_MARKS)}
             error={errors.maxMarks?.message}
             {...register("maxMarks")}
           />
           <FieldError message={errors.maxMarks?.message} />
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            This assessment stands on its own total. A student&apos;s result for the module is the average of
+            the percentages they score across all of its assessments.
+          </p>
         </div>
 
         <div>

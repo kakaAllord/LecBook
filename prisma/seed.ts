@@ -102,12 +102,13 @@ async function main() {
   }
   console.log(`Created ${students.length} students`);
 
-  // Assessment types/marks, per module, summing to the 60-mark cap.
+  // Assessment types per module. Each is marked out of its own total — a mix of
+  // totals here so reports are exercised against the averaging, not a shared cap.
   const assessmentPlan = [
-    { name: "Quiz 1", maxMarks: 10 },
-    { name: "CAT 1", maxMarks: 20 },
-    { name: "Assignment 1", maxMarks: 15 },
-    { name: "Final Project", maxMarks: 15 },
+    { name: "Quiz 1", maxMarks: 20 },
+    { name: "CAT 1", maxMarks: 50 },
+    { name: "Assignment 1", maxMarks: 100 },
+    { name: "Final Project", maxMarks: 100 },
   ];
 
   const assessments: { assessment: Awaited<ReturnType<typeof prisma.assessment.create>>; maxMarks: number; courseIds: string[] }[] = [];

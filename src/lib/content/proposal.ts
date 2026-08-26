@@ -84,7 +84,7 @@ export const PROPOSAL: Proposal = {
           items: [
             "Their students are already in the system. The administrator registers students and assigns each lecturer the modules they teach; a lecturer signs in and their class is simply there.",
             "Attendance is marked in a few taps per session, on a phone or a computer, with everyone defaulted to present.",
-            "Assessments and marks are recorded per module, with the system enforcing the marks cap so totals cannot drift.",
+            "Assessments and marks are recorded per module, each marked out of its own total, and a student's standing is the average of what they scored across them.",
             "A printable register with a signature column, so the paper trail and the digital record agree.",
             "Any session saved against the wrong module, date or class can be corrected without re-marking the whole roll.",
           ],

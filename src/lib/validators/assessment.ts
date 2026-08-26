@@ -1,12 +1,18 @@
 import { z } from "zod";
 
-export const MODULE_MARKS_CAP = 60;
+/** What a new assessment is marked out of unless the lecturer says otherwise. */
+export const DEFAULT_MAX_MARKS = 100;
 
 export const assessmentSchema = z.object({
   moduleId: z.string().min(1, "Module is required"),
   courseIds: z.array(z.string()).min(1, "Select at least one course"),
   name: z.string().min(1, "Assessment type/name is required").max(200),
-  maxMarks: z.coerce.number().positive("Marks must be greater than 0"),
+  // Each assessment stands on its own total; the only bound is one that catches
+  // a slipped keystroke, not a share of some module-wide allowance.
+  maxMarks: z.coerce
+    .number()
+    .positive("Marks must be greater than 0")
+    .max(1000, "Marks must be 1000 or less"),
   date: z.string().min(1, "Date is required"),
 });
 

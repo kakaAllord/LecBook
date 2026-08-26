@@ -166,9 +166,10 @@ const SECTIONS: Section[] = [
     roles: ["LECTURER"],
     steps: [
       'Open Assessments and click "New Assessment".',
-      "Choose the Module first: the page then tells you how many marks are still available out of the module's 60-mark cap, and how many are already allocated.",
-      'Tick the courses the assessment applies to, name it (e.g. "Quiz 1"), set its marks and date, then submit.',
-      "You land straight on marks entry, listing every active student. Marks above the assessment maximum are rejected as you type.",
+      "Choose the Module first, then tick the courses the assessment applies to.",
+      'Name it (e.g. "Quiz 1"), say what it is marked out of — 100 unless you change it — and set its date, then submit.',
+      "Each assessment stands on its own total. Nothing is shared between them: a quiz out of 20 and an exam out of 100 are both marked in full.",
+      "You land straight on marks entry, listing every active student. Marks above what the assessment is marked out of are rejected as you type.",
       "Average, highest and lowest update live as you enter marks, and marks can be revisited from the Assessments list at any time.",
     ],
   },
@@ -180,8 +181,8 @@ const SECTIONS: Section[] = [
     roles: ["ADMIN", "LECTURER"],
     steps: [
       'Attendance Report: choose a module, optionally one course and a date range, then "Download PDF" — a tick-sheet register, one row per student and one column per date, with totals, percentages and a signature column.',
-      'Assessment Report: choose a module and either one assessment or all of them, then "Download PDF". A single-assessment sheet includes average, highest and lowest; the all-assessments summary combines each student\'s scores. Both include a signature column.',
-      "Student Report: search for one student, then ask for either their attendance (any modules, any date range) or their marks (any modules, any assessments). Leaving a selection empty means all of it.",
+      'Assessment Report: choose a module and either one assessment or all of them, then "Download PDF". A single-assessment sheet gives each student their mark, that mark as a percentage of what the assessment was marked out of, and PASS or REDO against your pass mark, under a header carrying the average, highest and lowest. The all-assessments summary averages each student\'s percentages across the module and judges that average the same way. Both include a signature column.',
+      "Student Report: search for one student, then ask for either their attendance (any modules, any date range) or their marks (any modules, any assessments). Leaving a selection empty means all of it. Marks come back per module, each with its average and a PASS or REDO, and one overall average across everything selected.",
       "Every academic report is headed with the Institution Name and logo set by the administrator.",
     ],
   },
@@ -202,7 +203,7 @@ const SECTIONS: Section[] = [
     roles: ["LECTURER"],
     steps: [
       'Minimum Attendance Threshold: students below it are flagged "LOW" on your attendance reports and listed on your dashboard.',
-      "Assessment Pass Mark: students at or above it are marked PASS on your reports, below it REDO.",
+      "Assessment Pass Mark: a student's result for a module is the average of the percentages they scored across its assessments. At or above the pass mark they are marked PASS on your reports, below it REDO.",
       "Until you save your own figures the institution defaults apply — both are shown next to each field.",
       "This is also where you can re-download this guide at any time.",
     ],

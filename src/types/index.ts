@@ -130,12 +130,6 @@ export type Assessment = {
   _count?: { marks: number };
 };
 
-export type RemainingMarks = {
-  cap: number;
-  used: number;
-  remaining: number;
-};
-
 export type AssessmentMarkEntry = {
   id: string;
   marks: number;
