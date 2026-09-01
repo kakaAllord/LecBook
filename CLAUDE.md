@@ -11,7 +11,7 @@ separate development copy. Anything you run against it, people feel.**
 Read from it as much as you like — queries, reports, throwaway scripts that only
 select. Writing to it is a different thing: do it only when the change you were
 asked for is the change being written, and never as a way of trying something
-out. These four are the ones that bite:
+out. These are the ones that bite:
 
 | Command | What it does to real records |
 | --- | --- |
@@ -19,6 +19,7 @@ out. These four are the ones that bite:
 | `npm run db:seed:creds` | Upserts the three demo accounts **by email**, overwriting the password of any live account that shares one — it locks people out |
 | `npm run db:clear` | **Wipes** courses, modules, students, attendance, assessments, marks and settings |
 | `npm run db:migrate` | Alters the live schema; `prisma migrate reset` drops the data with it |
+| `npm run build` | Runs `prisma migrate deploy` — applies every pending migration to the live schema before compiling |
 
 To exercise a change end to end, point `DATABASE_URL` at a scratch database of
 your own first. When a schema change genuinely has to reach production, say so
@@ -73,7 +74,7 @@ the working directory is not stale.
 - The body says what was wrong before and why this is the fix. Assume the reader
   is you, in a year, wondering why.
 - No attribution trailers of any kind.
-- Before committing: `npx tsc --noEmit`, then `npm run build`, then the document
+- Before committing: `npx tsc --noEmit`, then `npm run build:local`, then the document
   check above.
 
 ## The shape of the system

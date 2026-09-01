@@ -105,17 +105,22 @@ npm run build
 npm run start
 ```
 
-`build` regenerates the Prisma client before compiling. The client is generated
-code inside `node_modules`, so a host that restores `node_modules` from a build
-cache would otherwise type-check against whichever schema was current when that
-cache was written, and fail on fields added since.
+`build` regenerates the Prisma client, applies any pending migrations, then
+compiles. The client is generated code inside `node_modules`, so a host that
+restores `node_modules` from a build cache would otherwise type-check against
+whichever schema was current when that cache was written, and fail on fields
+added since. Applying the migrations here is what keeps a deploy from shipping
+code that expects a column the database has not got yet — which means **a build
+writes to whatever `DATABASE_URL` points at**. To compile without touching a
+database, use `npm run build:local`.
 
 ## Available Scripts
 
 | Script | Description |
 | --- | --- |
 | `npm run dev` | Start the dev server |
-| `npm run build` | Production build (regenerates the Prisma client, then type-checks + lints) |
+| `npm run build` | Production build: regenerates the Prisma client, applies pending migrations to `DATABASE_URL`, then type-checks + lints. This is the deploy command — it alters the database it is pointed at. |
+| `npm run build:local` | The same build without the migration step, for checking that a change compiles. |
 | `npm run start` | Run the production build |
 | `npm run lint` | Run ESLint |
 | `npm run db:migrate` | Run Prisma migrations |
