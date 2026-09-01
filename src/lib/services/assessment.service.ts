@@ -9,11 +9,20 @@ function normalizeDate(date: string) {
   return parsed.startOf("day").toDate();
 }
 
-export async function listAssessments(moduleId?: string, courseId?: string) {
+export async function listAssessments(
+  moduleId?: string,
+  courseId?: string,
+  scopeModuleIds: string[] | null = null
+) {
   return prisma.assessment.findMany({
     where: {
-      ...(moduleId ? { moduleId } : {}),
-      ...(courseId ? { courses: { some: { id: courseId } } } : {}),
+      AND: [
+        // The scope is a second, independent restriction on the module: a
+        // lecturer filtering by "All modules" still only ever sees their own.
+        scopeModuleIds === null ? {} : { moduleId: { in: scopeModuleIds } },
+        ...(moduleId ? [{ moduleId }] : []),
+        ...(courseId ? [{ courses: { some: { id: courseId } } }] : []),
+      ],
     },
     orderBy: { date: "desc" },
     include: {

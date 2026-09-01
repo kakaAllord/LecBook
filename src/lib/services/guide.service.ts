@@ -171,6 +171,7 @@ const SECTIONS: Section[] = [
       "Each assessment stands on its own total. Nothing is shared between them: a quiz out of 20 and an exam out of 100 are both marked in full.",
       "You land straight on marks entry, listing every active student. Marks above what the assessment is marked out of are rejected as you type.",
       "Average, highest and lowest update live as you enter marks, and marks can be revisited from the Assessments list at any time.",
+      "The list holds the assessments of the modules you are assigned, and nothing else — another lecturer's assessments never appear in it.",
     ],
   },
 
@@ -182,7 +183,7 @@ const SECTIONS: Section[] = [
     steps: [
       'Attendance Report: choose a module, optionally one course and a date range, then "Download PDF" — a tick-sheet register, one row per student and one column per date, with totals, percentages and a signature column.',
       'Assessment Report: choose a module and either one assessment or all of them, then "Download PDF". A single-assessment sheet gives each student their mark, that mark as a percentage of what the assessment was marked out of, and PASS or REDO against your pass mark, under a header carrying the average, highest and lowest. The all-assessments summary averages each student\'s percentages across the module and judges that average the same way. Both include a signature column.',
-      "Student Report: search for one student, then ask for either their attendance (any modules, any date range) or their marks (any modules, any assessments). Leaving a selection empty means all of it. Marks come back per module, each with its average and a PASS or REDO, and one overall average across everything selected.",
+      "Student Report: search for one student, then ask for either their attendance (any modules, any date range) or their marks (any modules, any assessments). Leaving a selection empty means all of it — for a lecturer, all of their own modules. Marks come back per module, each with its average and a PASS or REDO, and one overall average across everything selected.",
       "Every academic report is headed with the Institution Name and logo set by the administrator.",
     ],
   },

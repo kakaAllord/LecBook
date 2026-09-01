@@ -6,6 +6,7 @@ import { computeStanding, passes, roundPercentage } from "@/lib/grading";
 import { getSettingsFor } from "@/lib/services/settings.service";
 import type { Session } from "@/lib/auth";
 import { toUtcDayStart, toUtcDayEnd } from "@/lib/date";
+import { getScopedModuleIds } from "@/lib/scope";
 import type { StudentExportInput } from "@/lib/validators/export";
 
 export type StudentExportData = {
@@ -68,6 +69,20 @@ function pct(part: number, whole: number) {
 }
 
 /**
+ * Narrows a chosen set of modules to the ones the reader is allowed to see.
+ * `null` means no restriction; an empty array means nothing matches, which is
+ * why the selection cannot simply fall back to "all modules" when it empties.
+ */
+function scopedModuleIds(selected: string[], scope: string[] | null): string[] | null {
+  if (scope === null) return selected.length > 0 ? selected : null;
+  return selected.length > 0 ? selected.filter((id) => scope.includes(id)) : scope;
+}
+
+function moduleFilter(ids: string[] | null) {
+  return ids === null ? {} : { moduleId: { in: ids } };
+}
+
+/**
  * Collects one student's record according to the chosen filters. Returns plain
  * data so the same result can be rendered as a PDF or copied as text.
  */
@@ -82,8 +97,11 @@ export async function buildStudentExport(
   ]);
   if (!student) throw new ApiError("Student not found", 404);
 
-  const attendanceModuleIds = options.attendanceModuleIds ?? [];
-  const assessmentModuleIds = options.assessmentModuleIds ?? [];
+  // A lecturer exports a student through the modules they teach, so the chosen
+  // modules are intersected with their assignment rather than trusted.
+  const scope = await getScopedModuleIds(session);
+  const attendanceModuleIds = scopedModuleIds(options.attendanceModuleIds ?? [], scope);
+  const assessmentModuleIds = scopedModuleIds(options.assessmentModuleIds ?? [], scope);
   const assessmentIds = options.assessmentIds ?? [];
 
   const from = options.attendanceFrom ? toUtcDayStart(options.attendanceFrom) ?? undefined : undefined;
@@ -109,8 +127,8 @@ export async function buildStudentExport(
         from || to
           ? `${from ? dayjs(from).format("DD MMM YYYY") : "start"} to ${to ? dayjs(to).format("DD MMM YYYY") : "today"}`
           : "All recorded dates",
-      attendanceModules: attendanceModuleIds.length > 0 ? `${attendanceModuleIds.length} selected` : "All modules",
-      assessmentModules: assessmentModuleIds.length > 0 ? `${assessmentModuleIds.length} selected` : "All modules",
+      attendanceModules: options.attendanceModuleIds?.length ? `${options.attendanceModuleIds.length} selected` : "All modules",
+      assessmentModules: options.assessmentModuleIds?.length ? `${options.assessmentModuleIds.length} selected` : "All modules",
       assessments: assessmentIds.length > 0 ? `${assessmentIds.length} selected` : "All assessments",
     },
     thresholds: { attendance: settings.attendanceThreshold, passMark: settings.assessmentPassMark },
@@ -120,7 +138,7 @@ export async function buildStudentExport(
     const records = await prisma.attendance.findMany({
       where: {
         studentId,
-        ...(attendanceModuleIds.length > 0 ? { moduleId: { in: attendanceModuleIds } } : {}),
+        ...moduleFilter(attendanceModuleIds),
         ...(from || to ? { date: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
       },
       include: { module: true },
@@ -174,7 +192,7 @@ export async function buildStudentExport(
     const assessments = await prisma.assessment.findMany({
       where: {
         courses: { some: { id: student.courseId } },
-        ...(assessmentModuleIds.length > 0 ? { moduleId: { in: assessmentModuleIds } } : {}),
+        ...moduleFilter(assessmentModuleIds),
         ...(assessmentIds.length > 0 ? { id: { in: assessmentIds } } : {}),
       },
       include: { module: true, marks: { where: { studentId } } },

@@ -1,7 +1,6 @@
 import { fail, handleApiError } from "@/lib/api-response";
 import { requireSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { assertModuleAccess } from "@/lib/scope";
+import { assertAssessmentAccess, assertModuleAccess } from "@/lib/scope";
 import { generateAssessmentReport, generateAllAssessmentsReport } from "@/lib/services/report.service";
 
 export const runtime = "nodejs";
@@ -26,12 +25,7 @@ export async function GET(request: Request) {
 
     if (assessmentId) {
       // The assessment's module decides who may download it.
-      const assessment = await prisma.assessment.findUnique({
-        where: { id: assessmentId },
-        select: { moduleId: true },
-      });
-      if (!assessment) return fail("Assessment not found", 404);
-      await assertModuleAccess(session, assessment.moduleId);
+      await assertAssessmentAccess(session, assessmentId);
 
       const { pdf, filename } = await generateAssessmentReport(session, assessmentId);
       return pdfResponse(pdf, filename);

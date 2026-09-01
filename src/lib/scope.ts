@@ -63,6 +63,23 @@ export async function assertModuleAccess(session: Session, moduleId: string) {
   }
 }
 
+/**
+ * An assessment belongs to a module, so the module the assessment sits in
+ * decides who may read it, mark it or delete it.
+ */
+export async function assertAssessmentAccess(session: Session, assessmentId: string) {
+  const ids = await getScopedModuleIds(session);
+  if (ids === null) return;
+  const assessment = await prisma.assessment.findUnique({
+    where: { id: assessmentId },
+    select: { moduleId: true },
+  });
+  if (!assessment) throw new ApiError("Assessment not found", 404);
+  if (!ids.includes(assessment.moduleId)) {
+    throw new ApiError("You are not assigned to this module", 403);
+  }
+}
+
 export async function assertStudentAccess(session: Session, studentId: string) {
   const ids = await getScopedCourseIds(session);
   if (ids === null) return;
