@@ -128,7 +128,7 @@ model Settings {
   institutionName     String   @default("Your Institution Name")
   institutionLogo     String?
   attendanceThreshold Float    @default(75)
-  assessmentPassMark  Float    @default(50)
+  assessmentPassMark  Float    @default(60)
   updatedAt           DateTime @updatedAt
 }
 

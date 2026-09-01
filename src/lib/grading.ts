@@ -41,7 +41,7 @@ export function computeStanding(items: ScoredAssessment[]): Standing {
 
 /**
  * A verdict is only given once something has been marked — calling a student
- * with no marks a "REDO" reads as a failing grade they never sat.
+ * with no marks a "FAIL" reads as a failing grade they never sat.
  */
 export function passes(standing: Standing, passMark: number) {
   return standing.graded > 0 && standing.average >= passMark;

@@ -110,7 +110,7 @@ export function TeachingSettingsBoard() {
                   />
                   <FieldError message={errors.assessmentPassMark?.message} />
                   <p className="mt-1 text-xs text-slate-400">
-                    Students at or above this are marked PASS, below it REDO. Institution default:{" "}
+                    Students at or above this are marked PASS, below it FAIL. Institution default:{" "}
                     {data.institutionDefaults.assessmentPassMark}%.
                   </p>
                 </div>

@@ -182,8 +182,8 @@ const SECTIONS: Section[] = [
     roles: ["ADMIN", "LECTURER"],
     steps: [
       'Attendance Report: choose a module, optionally one course and a date range, then "Download PDF" — a tick-sheet register, one row per student and one column per date, with totals, percentages and a signature column.',
-      'Assessment Report: choose a module and either one assessment or all of them, then "Download PDF". A single-assessment sheet gives each student their mark, that mark as a percentage of what the assessment was marked out of, and PASS or REDO against your pass mark, under a header carrying the average, highest and lowest. The all-assessments summary averages each student\'s percentages across the module and judges that average the same way. Both include a signature column.',
-      "Student Report: search for one student, then ask for either their attendance (any modules, any date range) or their marks (any modules, any assessments). Leaving a selection empty means all of it — for a lecturer, all of their own modules. Marks come back per module, each with its average and a PASS or REDO, and one overall average across everything selected.",
+      'Assessment Report: choose a module and either one assessment or all of them, then "Download PDF". A single-assessment sheet gives each student their mark, that mark as a percentage of what the assessment was marked out of, and PASS or FAIL against your pass mark, under a header carrying the average, highest and lowest. The all-assessments summary averages each student\'s percentages across the module and judges that average the same way. Both include a signature column.',
+      "Student Report: search for one student, then ask for either their attendance (any modules, any date range) or their marks (any modules, any assessments). Leaving a selection empty means all of it — for a lecturer, all of their own modules. Marks come back per module, each with its average and a PASS or FAIL, and one overall average across everything selected.",
       "Every academic report is headed with the Institution Name and logo set by the administrator.",
     ],
   },
@@ -204,7 +204,7 @@ const SECTIONS: Section[] = [
     roles: ["LECTURER"],
     steps: [
       'Minimum Attendance Threshold: students below it are flagged "LOW" on your attendance reports and listed on your dashboard.',
-      "Assessment Pass Mark: a student's result for a module is the average of the percentages they scored across its assessments. At or above the pass mark they are marked PASS on your reports, below it REDO.",
+      "Assessment Pass Mark: a student's result for a module is the average of the percentages they scored across its assessments. At or above the pass mark they are marked PASS on your reports, below it FAIL.",
       "Until you save your own figures the institution defaults apply — both are shown next to each field.",
       "This is also where you can re-download this guide at any time.",
     ],

@@ -156,7 +156,7 @@ database.
 - **Students** — read-only roll of everyone on a course that runs one of their modules.
 - **Attendance** — select a module, the attending course(s) and a date; mark each active student Present/Absent; save (upserts, so re-saving edits rather than duplicates); then edit, move or delete an already-saved session from its history.
 - **Assessments & Marks** — create an assessment against one of their modules and one or more of its courses, each marked out of its own total (100 by default), then enter or revisit marks per student. The list holds their own modules' assessments only. A student's result for a module is the average of the percentages they scored across its assessments, measured against the lecturer's pass mark.
-- **Reports** — attendance registers with a signature column, assessment sheets that print each mark as a percentage and a PASS/REDO against the pass mark, and a per-student report over any range of dates or set of assessments.
+- **Reports** — attendance registers with a signature column, assessment sheets that print each mark as a percentage and a PASS/FAIL against the pass mark, and a per-student report over any range of dates or set of assessments.
 - **Settings** — their own minimum attendance threshold and assessment pass mark, which their reports are measured against.
 
 ### Everywhere

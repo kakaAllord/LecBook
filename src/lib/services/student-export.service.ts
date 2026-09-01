@@ -296,7 +296,7 @@ export function renderStudentExportText(data: StudentExportData, options: Studen
     for (const m of data.assessments.modules) {
       lines.push(
         m.graded > 0
-          ? `  ${m.module} — average ${m.average}% over ${m.graded} of ${m.total} assessment${m.total === 1 ? "" : "s"} — ${m.passes ? "PASS" : "REDO"}`
+          ? `  ${m.module} — average ${m.average}% over ${m.graded} of ${m.total} assessment${m.total === 1 ? "" : "s"} — ${m.passes ? "PASS" : "FAIL"}`
           : `  ${m.module} — nothing marked yet`
       );
       for (const item of m.items) {
@@ -308,7 +308,7 @@ export function renderStudentExportText(data: StudentExportData, options: Studen
     lines.push(
       "",
       data.assessments.overall.graded > 0
-        ? `  OVERALL: average ${data.assessments.overall.average}% over ${data.assessments.overall.graded} of ${data.assessments.overall.total} assessments — ${data.assessments.overall.passes ? "PASS" : "REDO"}`
+        ? `  OVERALL: average ${data.assessments.overall.average}% over ${data.assessments.overall.graded} of ${data.assessments.overall.total} assessments — ${data.assessments.overall.passes ? "PASS" : "FAIL"}`
         : "  OVERALL: nothing marked yet",
       ""
     );
@@ -441,7 +441,7 @@ export async function renderStudentExportPdf(data: StudentExportData, options: S
             { text: m.module, width: 240, ellipsis: true },
             { text: `${m.graded} / ${m.total} marked`, width: 130, align: "right" },
             {
-              text: m.graded > 0 ? `average ${m.average}% · ${m.passes ? "PASS" : "REDO"}` : "nothing marked yet",
+              text: m.graded > 0 ? `average ${m.average}% · ${m.passes ? "PASS" : "FAIL"}` : "nothing marked yet",
               width: 145,
               align: "right",
             },
@@ -483,7 +483,7 @@ export async function renderStudentExportPdf(data: StudentExportData, options: S
             {
               text:
                 data.assessments.overall.graded > 0
-                  ? `average ${data.assessments.overall.average}% · ${data.assessments.overall.passes ? "PASS" : "REDO"}`
+                  ? `average ${data.assessments.overall.average}% · ${data.assessments.overall.passes ? "PASS" : "FAIL"}`
                   : "nothing marked yet",
               width: 145,
               align: "right",

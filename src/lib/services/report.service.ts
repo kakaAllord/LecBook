@@ -317,7 +317,7 @@ export async function generateAssessmentReport(session: Session, assessmentId: s
         rowY + 4,
         colWidths.status,
         HEADER_ROW_HEIGHT,
-        passed ? "PASS" : "REDO",
+        passed ? "PASS" : "FAIL",
         passed
       );
       // drawStatusCell writes at an absolute position and pdfkit advances doc.y
@@ -495,9 +495,9 @@ export async function generateAllAssessmentsReport(session: Session, moduleId: s
           });
           x += PCT_COL_WIDTH;
           // Nothing marked means no verdict to give: leave the cell empty rather
-          // than printing a REDO against work the student never sat.
+          // than printing a FAIL against work the student never sat.
           if (standing.graded > 0) {
-            drawStatusCell(doc, x, rowY, STATUS_COL_WIDTH, ROW_HEIGHT, passed ? "PASS" : "REDO", passed);
+            drawStatusCell(doc, x, rowY, STATUS_COL_WIDTH, ROW_HEIGHT, passed ? "PASS" : "FAIL", passed);
           }
           x += STATUS_COL_WIDTH;
           // Signature column intentionally left blank for physical sign-off.
