@@ -18,18 +18,7 @@ export async function listCourses(
   const where: Prisma.CourseWhereInput = {
     AND: [
       scopeWhere(scopeIds),
-      ...(search
-        ? [
-            {
-              OR: [
-                { name: { contains: search, mode: "insensitive" as const } },
-                { level: { contains: search, mode: "insensitive" as const } },
-                { semester: { contains: search, mode: "insensitive" as const } },
-                { academicYear: { contains: search, mode: "insensitive" as const } },
-              ],
-            },
-          ]
-        : []),
+      ...(search ? [{ name: { contains: search, mode: "insensitive" as const } }] : []),
     ],
   };
 

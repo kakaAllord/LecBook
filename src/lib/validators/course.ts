@@ -1,10 +1,12 @@
 import { z } from "zod";
 
+/**
+ * A course is a name. A student enrols on it once, on arrival, and stays on it
+ * until they leave — the level, semester and year a piece of teaching belongs
+ * to are properties of the module that runs, not of the course.
+ */
 export const courseSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
-  level: z.string().min(1, "Level is required").max(50),
-  semester: z.string().min(1, "Semester is required").max(50),
-  academicYear: z.string().min(1, "Academic year is required").max(20),
 });
 
 export const courseUpdateSchema = courseSchema.partial();

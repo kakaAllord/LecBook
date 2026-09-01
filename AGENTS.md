@@ -94,6 +94,9 @@ Load-bearing facts, each of which a document has got wrong before:
 
 - A lecturer is assigned **modules**, never courses. Their courses and students
   are derived from those modules (`src/lib/scope.ts`).
+- A **course is a name**. A student enrols on it once, on arrival, and stays on
+  it — it carries no level, semester or academic year. Those live on the
+  **module**, which is what is set up again for each term.
 - The attendance threshold and pass mark live **on the lecturer**, falling back
   to the institution defaults in `Settings` (`getSettingsFor`).
 - Attendance is **Present or Absent**. There is no Late and no Excused.

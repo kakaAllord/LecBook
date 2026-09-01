@@ -19,9 +19,6 @@ export type StudentExportData = {
     phone: string | null;
     status: string;
     course: string;
-    level: string;
-    semester: string;
-    academicYear: string;
     registeredOn: string;
   };
   filters: {
@@ -117,9 +114,6 @@ export async function buildStudentExport(
       phone: student.phone,
       status: student.status,
       course: student.course.name,
-      level: student.course.level,
-      semester: student.course.semester,
-      academicYear: student.course.academicYear,
       registeredOn: dayjs(student.createdAt).format("DD MMM YYYY"),
     },
     filters: {
@@ -264,8 +258,6 @@ export function renderStudentExportText(data: StudentExportData, options: Studen
     lines.push(`  Gender:          ${data.student.gender}`);
     lines.push(`  Phone:           ${data.student.phone || "-"}`);
     lines.push(`  Course:          ${data.student.course}`);
-    lines.push(`  Level/Semester:  ${data.student.level} · ${data.student.semester}`);
-    lines.push(`  Academic Year:   ${data.student.academicYear}`);
     lines.push(`  Status:          ${data.student.status}`);
     lines.push(`  Registered:      ${data.student.registeredOn}`);
     lines.push("");
@@ -355,8 +347,6 @@ export async function renderStudentExportPdf(data: StudentExportData, options: S
         ["Gender", data.student.gender],
         ["Phone", data.student.phone || "-"],
         ["Course", data.student.course],
-        ["Level / Semester", `${data.student.level} · ${data.student.semester}`],
-        ["Academic Year", data.student.academicYear],
         ["Status", data.student.status],
         ["Registered On", data.student.registeredOn],
       ];

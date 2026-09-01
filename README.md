@@ -144,7 +144,7 @@ database.
 ### Administrator — the institution's records
 
 - **Dashboard** — students, courses, modules and lecturers, plus the setup gaps still open (modules with no lecturer, courses with no modules or students, invites not yet opened), each linking to the page that closes it.
-- **Courses / Modules** — full CRUD with search; modules are linked to the courses that run them.
+- **Courses / Modules** — full CRUD with search. A course is a name and nothing else: a student enrols on it once, on arrival, and stays on it. The level, semester and academic year sit on the **module**, which is what is registered again each term and is linked to the courses that run it.
 - **Students** — registration with unique registration numbers, search, filters and CRUD, plus configurable per-student PDF/text exports. Registration is the administrator's job; lecturers never register anyone.
 - **Lecturers** — add a lecturer, tick the modules they teach, and copy the one-time invite link to send them. Edit assignments, issue a replacement invite while setup is pending, activate/deactivate access, or delete the account.
 - **Reports** — attendance registers, assessment sheets, and a per-student report.

@@ -35,8 +35,13 @@ export async function POST(request: Request) {
       action: "module.create",
       entity: "Module",
       entityId: module_.id,
-      summary: `${session.name} created the module ${module_.name}`,
-      metadata: { courses: module_.courses.map((c) => c.name) },
+      summary: `${session.name} created the module ${module_.name} (${module_.level}, ${module_.semester})`,
+      metadata: {
+        courses: module_.courses.map((c) => c.name),
+        level: module_.level,
+        semester: module_.semester,
+        academicYear: module_.academicYear,
+      },
     });
 
     return ok(module_, 201);

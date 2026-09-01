@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       action: "course.create",
       entity: "Course",
       entityId: course.id,
-      summary: `${session.name} created the course ${course.name} (${course.level}, ${course.semester})`,
+      summary: `${session.name} created the course ${course.name}`,
     });
 
     return ok(course, 201);

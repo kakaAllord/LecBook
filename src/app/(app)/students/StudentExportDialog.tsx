@@ -146,7 +146,7 @@ export function StudentExportDialog({
             checked={options.includeProfile}
             onChange={(v) => set("includeProfile", v)}
             label="Student details"
-            hint="Name, registration number, course, level, semester and status."
+            hint="Name, registration number, course and status."
           />
         </div>
 

@@ -92,9 +92,6 @@ export function CoursesBoard() {
             <THead>
               <TR>
                 <TH>Name</TH>
-                <TH>Level</TH>
-                <TH>Semester</TH>
-                <TH>Academic Year</TH>
                 <TH>Students</TH>
                 <TH className="text-right">Actions</TH>
               </TR>
@@ -103,9 +100,6 @@ export function CoursesBoard() {
               {data.items.map((course) => (
                 <TR key={course.id}>
                   <TD className="font-medium text-slate-900 dark:text-slate-100">{course.name}</TD>
-                  <TD>{course.level}</TD>
-                  <TD>{course.semester}</TD>
-                  <TD>{course.academicYear}</TD>
                   <TD>{course._count?.students ?? 0}</TD>
                   <TD>
                     <div className="flex justify-end gap-1">

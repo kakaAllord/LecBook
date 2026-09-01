@@ -129,7 +129,7 @@ export function StudentFormDialog({
             <option value="">Select a course...</option>
             {courses?.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name} · {c.level} · {c.semester}
+                {c.name}
               </option>
             ))}
           </Select>

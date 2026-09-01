@@ -30,9 +30,9 @@ async function main() {
   const { lecturer } = await seedCredentials(prisma);
 
   const courseData = [
-    { name: "Electrical Engineering", level: "Level 5", semester: "Semester II", academicYear: "2026" },
-    { name: "Mechanical Engineering", level: "Level 4", semester: "Semester I", academicYear: "2026" },
-    { name: "Computer Science", level: "Level 6", semester: "Semester II", academicYear: "2026" },
+    { name: "Electrical Engineering" },
+    { name: "Mechanical Engineering" },
+    { name: "Computer Science" },
   ];
   const courses: Awaited<ReturnType<typeof prisma.course.create>>[] = [];
   for (const c of courseData) {
@@ -45,14 +45,23 @@ async function main() {
 
   // Modules demonstrate both scenarios: a module scoped to a single course,
   // and a module shared across several courses that may attend on different days.
+  const term = { semester: "Semester II", academicYear: "2026" };
   const moduleData = [
-    { name: "Database Systems", code: "CS201", courseNames: ["Computer Science"] },
-    { name: "Circuit Theory", code: "EE210", courseNames: ["Electrical Engineering"] },
-    { name: "Thermodynamics", code: "ME220", courseNames: ["Mechanical Engineering"] },
-    { name: "Programming Fundamentals", code: "CS101", courseNames: ["Computer Science", "Electrical Engineering"] },
+    { name: "Database Systems", code: "CS201", level: "Level 6", ...term, courseNames: ["Computer Science"] },
+    { name: "Circuit Theory", code: "EE210", level: "Level 5", ...term, courseNames: ["Electrical Engineering"] },
+    { name: "Thermodynamics", code: "ME220", level: "Level 4", ...term, courseNames: ["Mechanical Engineering"] },
+    {
+      name: "Programming Fundamentals",
+      code: "CS101",
+      level: "Level 4",
+      ...term,
+      courseNames: ["Computer Science", "Electrical Engineering"],
+    },
     {
       name: "Linear Algebra",
       code: "MATH101",
+      level: "Level 4",
+      ...term,
       courseNames: ["Electrical Engineering", "Mechanical Engineering", "Computer Science"],
     },
   ];
@@ -63,6 +72,9 @@ async function main() {
       data: {
         name: m.name,
         code: m.code,
+        level: m.level,
+        semester: m.semester,
+        academicYear: m.academicYear,
         courses: { connect: linkedCourses.map((c) => ({ id: c.id })) },
       },
       include: { courses: true },

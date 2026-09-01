@@ -26,6 +26,9 @@ export async function listModules(
               OR: [
                 { name: { contains: search, mode: "insensitive" as const } },
                 { code: { contains: search, mode: "insensitive" as const } },
+                { level: { contains: search, mode: "insensitive" as const } },
+                { semester: { contains: search, mode: "insensitive" as const } },
+                { academicYear: { contains: search, mode: "insensitive" as const } },
               ],
             },
           ]
@@ -70,6 +73,9 @@ export async function createModule(data: ModuleInput) {
     data: {
       name: data.name,
       code: data.code || null,
+      level: data.level,
+      semester: data.semester,
+      academicYear: data.academicYear,
       courses: { connect: data.courseIds.map((id) => ({ id })) },
     },
     include: { courses: true },
@@ -85,6 +91,9 @@ export async function updateModule(id: string, data: ModuleUpdateInput) {
     data: {
       ...(data.name !== undefined ? { name: data.name } : {}),
       ...(data.code !== undefined ? { code: data.code || null } : {}),
+      ...(data.level !== undefined ? { level: data.level } : {}),
+      ...(data.semester !== undefined ? { semester: data.semester } : {}),
+      ...(data.academicYear !== undefined ? { academicYear: data.academicYear } : {}),
       ...(data.courseIds ? { courses: { set: data.courseIds.map((id) => ({ id })) } } : {}),
     },
     include: { courses: true },

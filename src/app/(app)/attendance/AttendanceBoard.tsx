@@ -127,7 +127,7 @@ export function AttendanceBoard() {
         <div className="sm:w-72">
           <Label htmlFor="courses">Course(s) present this session</Label>
           <CheckboxGroup
-            options={(selectedModule?.courses ?? []).map((c) => ({ id: c.id, label: `${c.name} · ${c.level} · ${c.semester}` }))}
+            options={(selectedModule?.courses ?? []).map((c) => ({ id: c.id, label: c.name }))}
             value={courseIds}
             onChange={setCourseIds}
             className="sm:max-h-40"

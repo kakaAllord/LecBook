@@ -101,7 +101,7 @@ export function NewAssessmentDialog({ open, onClose }: { open: boolean; onClose:
               <CheckboxGroup
                 options={(selectedModule?.courses ?? []).map((c) => ({
                   id: c.id,
-                  label: `${c.name} · ${c.level} · ${c.semester}`,
+                  label: c.name,
                 }))}
                 value={field.value ?? []}
                 onChange={field.onChange}

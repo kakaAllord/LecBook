@@ -95,6 +95,9 @@ export function ModulesBoard() {
               <TR>
                 <TH>Name</TH>
                 <TH>Code</TH>
+                <TH>Level</TH>
+                <TH>Semester</TH>
+                <TH>Academic Year</TH>
                 <TH>Courses</TH>
                 <TH>Assessments</TH>
                 <TH className="text-right">Actions</TH>
@@ -105,6 +108,9 @@ export function ModulesBoard() {
                 <TR key={module_.id}>
                   <TD className="font-medium text-slate-900 dark:text-slate-100">{module_.name}</TD>
                   <TD>{module_.code || "-"}</TD>
+                  <TD>{module_.level || "-"}</TD>
+                  <TD>{module_.semester || "-"}</TD>
+                  <TD>{module_.academicYear || "-"}</TD>
                   <TD>{module_.courses.map((c) => c.name).join(", ") || "-"}</TD>
                   <TD>{module_._count?.assessments ?? 0}</TD>
                   <TD>

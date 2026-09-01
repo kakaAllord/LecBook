@@ -94,8 +94,9 @@ const SECTIONS: Section[] = [
     intro: "Set up what is taught before registering anyone against it.",
     roles: ["ADMIN"],
     steps: [
-      'Open Courses and click "New Course": Name, Level, Semester and Academic Year (e.g. Electrical Engineering, Level 5, Semester II, 2026).',
-      'Open Modules and click "New Module": a name, an optional code, and the courses that run it. One module can be shared by several courses.',
+      'Open Courses and click "New Course": the name, and nothing else (e.g. Electrical Engineering). A student enrols on a course once, when they arrive, so a course is never registered again for a new term.',
+      'Open Modules and click "New Module": a name, an optional code, the Level, Semester and Academic Year it runs in, and the courses that run it (e.g. Circuit Theory, EE210, Level 5, Semester II, 2026). One module can be shared by several courses.',
+      "The term lives on the module because that is what changes: the same course is taught through a different set of modules each semester.",
       "Use the search bar to find a record, or the pencil and trash icons on a row to edit or delete it.",
       "Deleting a course or module asks for confirmation first. Keep records that still matter rather than deleting their parent course or module.",
     ],

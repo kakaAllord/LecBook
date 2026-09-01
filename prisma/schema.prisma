@@ -132,24 +132,30 @@ model Settings {
   updatedAt           DateTime @updatedAt
 }
 
+// A course is what a student enrols on when they arrive and stays with them
+// until they leave, so it carries nothing that changes term to term — the
+// stage a piece of teaching sits at belongs to the module, not to this.
 model Course {
-  id           String   @id @default(cuid())
-  name         String
-  level        String
-  semester     String
-  academicYear String
-  createdAt    DateTime @default(now())
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
 
   students    Student[]
   modules     Module[]     @relation("ModuleCourses")
   assessments Assessment[] @relation("AssessmentCourses")
 }
 
+// A module is the thing that runs in a given term: the same course is taught
+// through a different set of modules each semester. Level, semester and year
+// are optional because modules recorded before they existed have none.
 model Module {
-  id        String   @id @default(cuid())
-  name      String
-  code      String?
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  name         String
+  code         String?
+  level        String?
+  semester     String?
+  academicYear String?
+  createdAt    DateTime @default(now())
 
   courses     Course[]     @relation("ModuleCourses")
   attendance  Attendance[]

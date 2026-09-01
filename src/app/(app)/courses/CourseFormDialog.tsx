@@ -33,11 +33,7 @@ export function CourseFormDialog({
 
   useEffect(() => {
     if (open) {
-      reset(
-        course
-          ? { name: course.name, level: course.level, semester: course.semester, academicYear: course.academicYear }
-          : { name: "", level: "", semester: "", academicYear: "" }
-      );
+      reset(course ? { name: course.name } : { name: "" });
     }
   }, [open, course, reset]);
 
@@ -62,23 +58,10 @@ export function CourseFormDialog({
           <Input id="name" placeholder="Electrical Engineering" error={errors.name?.message} {...register("name")} />
           <FieldError message={errors.name?.message} />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="level">Level</Label>
-            <Input id="level" placeholder="Level 5" error={errors.level?.message} {...register("level")} />
-            <FieldError message={errors.level?.message} />
-          </div>
-          <div>
-            <Label htmlFor="semester">Semester</Label>
-            <Input id="semester" placeholder="Semester II" error={errors.semester?.message} {...register("semester")} />
-            <FieldError message={errors.semester?.message} />
-          </div>
-        </div>
-        <div>
-          <Label htmlFor="academicYear">Academic Year</Label>
-          <Input id="academicYear" placeholder="2026" error={errors.academicYear?.message} {...register("academicYear")} />
-          <FieldError message={errors.academicYear?.message} />
-        </div>
+        <p className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+          A student enrols on a course once and stays on it. The level, semester and year belong to the modules that
+          run for it, so a course is never registered again for a new term.
+        </p>
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel

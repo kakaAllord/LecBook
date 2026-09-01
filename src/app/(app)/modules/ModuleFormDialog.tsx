@@ -43,8 +43,15 @@ export function ModuleFormDialog({
     if (open) {
       reset(
         module
-          ? { name: module.name, code: module.code ?? "", courseIds: module.courses.map((c) => c.id) }
-          : { name: "", code: "", courseIds: [] }
+          ? {
+              name: module.name,
+              code: module.code ?? "",
+              level: module.level ?? "",
+              semester: module.semester ?? "",
+              academicYear: module.academicYear ?? "",
+              courseIds: module.courses.map((c) => c.id),
+            }
+          : { name: "", code: "", level: "", semester: "", academicYear: "", courseIds: [] }
       );
     }
   }, [open, module, reset]);
@@ -75,6 +82,23 @@ export function ModuleFormDialog({
           <Input id="code" placeholder="CS201" error={errors.code?.message} {...register("code")} />
           <FieldError message={errors.code?.message} />
         </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="level">Level</Label>
+            <Input id="level" placeholder="Level 5" error={errors.level?.message} {...register("level")} />
+            <FieldError message={errors.level?.message} />
+          </div>
+          <div>
+            <Label htmlFor="semester">Semester</Label>
+            <Input id="semester" placeholder="Semester II" error={errors.semester?.message} {...register("semester")} />
+            <FieldError message={errors.semester?.message} />
+          </div>
+        </div>
+        <div>
+          <Label htmlFor="academicYear">Academic Year</Label>
+          <Input id="academicYear" placeholder="2026" error={errors.academicYear?.message} {...register("academicYear")} />
+          <FieldError message={errors.academicYear?.message} />
+        </div>
         <div>
           <Label htmlFor="courseIds">Courses</Label>
           <Controller
@@ -82,7 +106,7 @@ export function ModuleFormDialog({
             name="courseIds"
             render={({ field }) => (
               <CheckboxGroup
-                options={(courses ?? []).map((c) => ({ id: c.id, label: `${c.name} · ${c.level} · ${c.semester}` }))}
+                options={(courses ?? []).map((c) => ({ id: c.id, label: c.name }))}
                 value={field.value ?? []}
                 onChange={field.onChange}
               />

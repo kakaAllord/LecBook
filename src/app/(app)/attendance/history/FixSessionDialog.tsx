@@ -137,7 +137,7 @@ export function FixSessionDialog({
           <CheckboxGroup
             options={(targetModule?.courses ?? []).map((c) => ({
               id: c.id,
-              label: `${c.name} · ${c.level} · ${c.semester}`,
+              label: c.name,
             }))}
             value={targetCourseIds}
             onChange={setTargetCourseIds}

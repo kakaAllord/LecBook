@@ -56,9 +56,6 @@ export type AuditLogEntry = {
 export type Course = {
   id: string;
   name: string;
-  level: string;
-  semester: string;
-  academicYear: string;
   createdAt: string;
   modules?: Module[];
   _count?: { students: number };
@@ -68,6 +65,9 @@ export type Module = {
   id: string;
   name: string;
   code: string | null;
+  level: string | null;
+  semester: string | null;
+  academicYear: string | null;
   createdAt: string;
   courses: Course[];
   _count?: { assessments: number };
