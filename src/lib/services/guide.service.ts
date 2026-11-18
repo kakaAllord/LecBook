@@ -185,7 +185,8 @@ const SECTIONS: Section[] = [
       'Attendance Report: choose a module, optionally one course and a date range, then "Download PDF" — a tick-sheet register, one row per student and one column per date, with totals, percentages and a signature column.',
       'Assessment Report: choose a module and either one assessment or all of them, then "Download PDF". A single-assessment sheet gives each student their mark, that mark as a percentage of what the assessment was marked out of, and PASS or FAIL against your pass mark, under a header carrying the average, highest and lowest. The all-assessments summary averages each student\'s percentages across the module and judges that average the same way. Both include a signature column.',
       "Student Report: search for one student, then ask for either their attendance (any modules, any date range) or their marks (any modules, any assessments). Leaving a selection empty means all of it — for a lecturer, all of their own modules. Marks come back per module, each with its average and a PASS or FAIL, and one overall average across everything selected.",
-      "Every academic report is headed with the Institution Name and logo set by the administrator.",
+      "Every academic report is headed with the logo set by the administrator, centred at the top, with the Institution Name directly beneath it.",
+      "Reports are set in Trebuchet MS at 10 to 12 point, with every table cell centred and padded so the printout reads as a tidy document.",
     ],
   },
   {
@@ -194,7 +195,7 @@ const SECTIONS: Section[] = [
     roles: ["ADMIN"],
     steps: [
       "Set the Institution Name — it appears in the sidebar and at the top of every academic report PDF.",
-      "Upload an Institution Logo; it is resized automatically and printed on reports alongside the name.",
+      "Upload an Institution Logo; it is resized automatically and printed centred at the top of every report, above the name.",
       "This is also where you can re-download this guide at any time.",
       "Attendance thresholds and pass marks are not set here: each lecturer sets one pair of their own values, applied across the modules they teach.",
     ],

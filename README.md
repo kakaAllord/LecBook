@@ -190,3 +190,4 @@ rule.
 - JSON API responses use a consistent envelope: `{ success: true, data }` or `{ success: false, message }`. PDF-download endpoints return `application/pdf`, and the view-as endpoint redirects into the selected workspace.
 - Client and server both validate input with the same Zod schemas.
 - `pdfkit` is registered under `serverExternalPackages` in `next.config.ts` — required so its bundled font files resolve correctly at runtime; do not remove this without re-testing report generation.
+- Reports are set in Trebuchet MS at 10–12pt with every table cell centred and padded, the logo centred above the institution name (`src/lib/pdf.ts`). The font is read from `assets/fonts/trebuc.ttf` and `trebucbd.ttf`, which must be copied from a licensed Windows machine (see `assets/fonts/README.md`); without them reports fall back to Helvetica. `outputFileTracingIncludes` in `next.config.ts` ships that folder with the server build.

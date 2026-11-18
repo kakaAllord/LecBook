@@ -1,7 +1,16 @@
 import dayjs from "dayjs";
 import { prisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api-response";
-import { bufferPdf, addReportHeader, drawTableRow } from "@/lib/pdf";
+import {
+  bufferPdf,
+  addReportHeader,
+  addSectionTitle,
+  addParagraph,
+  addGeneratedFooter,
+  drawTableRow,
+  needsPageBreak,
+  HEADER_SHADE,
+} from "@/lib/pdf";
 import { computeStanding, passes, roundPercentage } from "@/lib/grading";
 import { getSettingsFor } from "@/lib/services/settings.service";
 import type { Session } from "@/lib/auth";
@@ -12,6 +21,7 @@ import type { StudentExportInput } from "@/lib/validators/export";
 export type StudentExportData = {
   generatedAt: string;
   institutionName: string;
+  institutionLogo: string | null;
   student: {
     registrationNumber: string;
     fullName: string;
@@ -107,6 +117,7 @@ export async function buildStudentExport(
   const data: StudentExportData = {
     generatedAt: dayjs().format("DD MMM YYYY, HH:mm"),
     institutionName: settings.institutionName,
+    institutionLogo: settings.institutionLogo,
     student: {
       registrationNumber: student.registrationNumber,
       fullName: student.fullName,
@@ -327,20 +338,34 @@ export function renderStudentExportText(data: StudentExportData, options: Studen
   return lines.join("\n");
 }
 
-const COL = { label: 150, value: 300 };
+// Portrait widths at the 10pt report size; each table spans the usable width.
+const PROFILE = { label: 175, value: 340 };
+const ATTENDANCE = { module: 175, present: 65, absent: 65, sessions: 70, rate: 70, status: 70 };
+const RECORD = { date: 175, status: 130, remarks: 210 };
+const ASSESSMENT = { name: 155, date: 110, marks: 110, remarks: 140 };
+const ASSESSMENT_MODULE = { module: 215, marked: 130, result: 170 };
 
 export async function renderStudentExportPdf(data: StudentExportData, options: StudentExportInput) {
   const pdf = await bufferPdf((doc) => {
-    addReportHeader(
-      doc,
-      data.institutionName,
-      "Student Record",
-      `${data.student.fullName} · ${data.student.registrationNumber}`,
-      null
-    );
+    const header = () =>
+      addReportHeader(
+        doc,
+        data.institutionName,
+        "Student Record",
+        `${data.student.fullName} · ${data.student.registrationNumber}`,
+        data.institutionLogo
+      );
+    const breakIfNeeded = () => {
+      if (needsPageBreak(doc)) {
+        doc.addPage();
+        header();
+      }
+    };
+
+    header();
 
     if (options.includeProfile) {
-      sectionTitle(doc, "Student Details");
+      addSectionTitle(doc, "Student Details");
       const rows: [string, string][] = [
         ["Full Name", data.student.fullName],
         ["Registration Number", data.student.registrationNumber],
@@ -351,188 +376,147 @@ export async function renderStudentExportPdf(data: StudentExportData, options: S
         ["Registered On", data.student.registeredOn],
       ];
       for (const [label, value] of rows) {
+        breakIfNeeded();
         drawTableRow(doc, [
-          { text: label, width: COL.label },
-          { text: value, width: COL.value, ellipsis: true },
+          { text: label, width: PROFILE.label },
+          { text: value, width: PROFILE.value },
         ]);
       }
       doc.moveDown(0.8);
     }
 
     if (data.attendance) {
-      sectionTitle(doc, `Attendance — ${data.filters.attendanceRange}`);
+      addSectionTitle(doc, `Attendance — ${data.filters.attendanceRange}`);
       drawTableRow(
         doc,
         [
-          { text: "Module", width: 200 },
-          { text: "Present", width: 60, align: "right" },
-          { text: "Absent", width: 60, align: "right" },
-          { text: "Sessions", width: 60, align: "right" },
-          { text: "Attendance", width: 70, align: "right" },
-          { text: "Status", width: 65, align: "center" },
+          { text: "Module", width: ATTENDANCE.module },
+          { text: "Present", width: ATTENDANCE.present },
+          { text: "Absent", width: ATTENDANCE.absent },
+          { text: "Sessions", width: ATTENDANCE.sessions },
+          { text: "Attendance", width: ATTENDANCE.rate },
+          { text: "Status", width: ATTENDANCE.status },
         ],
-        { bold: true }
+        { bold: true, shade: HEADER_SHADE, wrap: true }
       );
 
       for (const m of data.attendance.modules) {
-        pageBreakIfNeeded(doc, data, options);
+        breakIfNeeded();
         drawTableRow(doc, [
-          { text: m.module, width: 200, ellipsis: true },
-          { text: String(m.present), width: 60, align: "right" },
-          { text: String(m.absent), width: 60, align: "right" },
-          { text: String(m.total), width: 60, align: "right" },
-          { text: `${m.percentage}%`, width: 70, align: "right" },
-          { text: m.meetsThreshold ? "OK" : "LOW", width: 65, align: "center" },
+          { text: m.module, width: ATTENDANCE.module },
+          { text: String(m.present), width: ATTENDANCE.present },
+          { text: String(m.absent), width: ATTENDANCE.absent },
+          { text: String(m.total), width: ATTENDANCE.sessions },
+          { text: `${m.percentage}%`, width: ATTENDANCE.rate },
+          { text: m.meetsThreshold ? "OK" : "LOW", width: ATTENDANCE.status, status: { positive: m.meetsThreshold } },
         ]);
 
         if (m.records) {
           for (const r of m.records) {
-            pageBreakIfNeeded(doc, data, options);
-            drawTableRow(
-              doc,
-              [
-                { text: "", width: 20 },
-                { text: r.date, width: 100 },
-                { text: r.status, width: 70 },
-                { text: r.remarks || "-", width: 325, ellipsis: true },
-              ],
-              { fontSize: 8 }
-            );
+            breakIfNeeded();
+            drawTableRow(doc, [
+              { text: r.date, width: RECORD.date },
+              { text: r.status, width: RECORD.status },
+              { text: r.remarks || "-", width: RECORD.remarks },
+            ]);
           }
         }
       }
 
       if (data.attendance.modules.length === 0) {
-        doc.font("Helvetica").fontSize(9).text("No attendance recorded for this selection.");
+        addParagraph(doc, "No attendance recorded for this selection.");
       } else {
+        breakIfNeeded();
         drawTableRow(
           doc,
           [
-            { text: "OVERALL", width: 200 },
-            { text: String(data.attendance.overall.present), width: 60, align: "right" },
-            { text: String(data.attendance.overall.absent), width: 60, align: "right" },
-            { text: String(data.attendance.overall.total), width: 60, align: "right" },
-            { text: `${data.attendance.overall.percentage}%`, width: 70, align: "right" },
-            { text: "", width: 65 },
+            { text: "OVERALL", width: ATTENDANCE.module },
+            { text: String(data.attendance.overall.present), width: ATTENDANCE.present },
+            { text: String(data.attendance.overall.absent), width: ATTENDANCE.absent },
+            { text: String(data.attendance.overall.total), width: ATTENDANCE.sessions },
+            { text: `${data.attendance.overall.percentage}%`, width: ATTENDANCE.rate },
+            { text: "", width: ATTENDANCE.status },
           ],
-          { bold: true }
+          { bold: true, shade: HEADER_SHADE, wrap: true }
         );
       }
       doc.moveDown(0.8);
     }
 
     if (data.assessments) {
-      sectionTitle(doc, "Assessments");
+      addSectionTitle(doc, "Assessments");
       for (const m of data.assessments.modules) {
-        pageBreakIfNeeded(doc, data, options);
+        breakIfNeeded();
         drawTableRow(
           doc,
           [
-            { text: m.module, width: 240, ellipsis: true },
-            { text: `${m.graded} / ${m.total} marked`, width: 130, align: "right" },
+            { text: m.module, width: ASSESSMENT_MODULE.module },
+            { text: `${m.graded} / ${m.total} marked`, width: ASSESSMENT_MODULE.marked },
             {
               text: m.graded > 0 ? `average ${m.average}% · ${m.passes ? "PASS" : "FAIL"}` : "nothing marked yet",
-              width: 145,
-              align: "right",
+              width: ASSESSMENT_MODULE.result,
             },
           ],
-          { bold: true }
+          { bold: true, shade: HEADER_SHADE, wrap: true }
         );
         for (const item of m.items) {
-          pageBreakIfNeeded(doc, data, options);
-          drawTableRow(
-            doc,
-            [
-              { text: "", width: 20 },
-              { text: item.name, width: 150, ellipsis: true },
-              { text: item.date, width: 90 },
-              {
-                text: item.marks === null ? "not marked" : `${item.marks} / ${item.maxMarks}`,
-                width: 100,
-                align: "right",
-              },
-              { text: item.remarks || "-", width: 155, ellipsis: true },
-            ],
-            { fontSize: 8 }
-          );
+          breakIfNeeded();
+          drawTableRow(doc, [
+            { text: item.name, width: ASSESSMENT.name },
+            { text: item.date, width: ASSESSMENT.date },
+            { text: item.marks === null ? "not marked" : `${item.marks} / ${item.maxMarks}`, width: ASSESSMENT.marks },
+            { text: item.remarks || "-", width: ASSESSMENT.remarks },
+          ]);
         }
       }
 
       if (data.assessments.modules.length === 0) {
-        doc.font("Helvetica").fontSize(9).text("No assessments recorded for this selection.");
+        addParagraph(doc, "No assessments recorded for this selection.");
       } else {
+        breakIfNeeded();
         drawTableRow(
           doc,
           [
-            { text: "OVERALL", width: 240 },
+            { text: "OVERALL", width: ASSESSMENT_MODULE.module },
             {
               text: `${data.assessments.overall.graded} / ${data.assessments.overall.total} marked`,
-              width: 130,
-              align: "right",
+              width: ASSESSMENT_MODULE.marked,
             },
             {
               text:
                 data.assessments.overall.graded > 0
                   ? `average ${data.assessments.overall.average}% · ${data.assessments.overall.passes ? "PASS" : "FAIL"}`
                   : "nothing marked yet",
-              width: 145,
-              align: "right",
+              width: ASSESSMENT_MODULE.result,
             },
           ],
-          { bold: true }
+          { bold: true, shade: HEADER_SHADE, wrap: true }
         );
       }
       doc.moveDown(0.8);
     }
 
     if (options.includeSummary) {
-      sectionTitle(doc, "Summary");
-      doc.font("Helvetica").fontSize(9).fillColor("#111827");
+      addSectionTitle(doc, "Summary");
       if (data.attendance) {
-        doc.text(
+        addParagraph(
+          doc,
           `Attendance: ${data.attendance.overall.percentage}% against a ${data.thresholds.attendance}% requirement.`
         );
       }
       if (data.assessments) {
-        doc.text(
+        addParagraph(
+          doc,
           data.assessments.overall.graded > 0
             ? `Assessments: an average of ${data.assessments.overall.average}% across ${data.assessments.overall.graded} marked assessment${data.assessments.overall.graded === 1 ? "" : "s"}, against a ${data.thresholds.passMark}% pass mark.`
             : "Assessments: none marked for this selection."
         );
       }
-      doc.moveDown(0.5);
     }
 
-    doc
-      .fontSize(8)
-      .fillColor("#888888")
-      .text(`Generated on ${data.generatedAt}`, { align: "right" });
+    addGeneratedFooter(doc, data.generatedAt);
   });
 
   const safeName = data.student.registrationNumber.replace(/[^a-zA-Z0-9-]/g, "-");
   return { pdf, filename: `student-record-${safeName}-${dayjs().format("YYYYMMDD")}.pdf` };
-}
-
-function sectionTitle(doc: PDFKit.PDFDocument, title: string) {
-  doc.moveDown(0.4);
-  doc.font("Helvetica-Bold").fontSize(11).fillColor("#111827").text(title);
-  doc.moveDown(0.3);
-  doc.font("Helvetica").fontSize(9);
-}
-
-function pageBreakIfNeeded(
-  doc: PDFKit.PDFDocument,
-  data: StudentExportData,
-  _options: StudentExportInput
-) {
-  if (doc.y > doc.page.height - doc.page.margins.bottom - 30) {
-    doc.addPage();
-    addReportHeader(
-      doc,
-      data.institutionName,
-      "Student Record",
-      `${data.student.fullName} · ${data.student.registrationNumber}`,
-      null
-    );
-  }
 }
