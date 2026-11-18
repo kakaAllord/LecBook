@@ -54,3 +54,6 @@ public/getting-started-guide.pdf
 
 # Local-only notes and credentials
 *.local.md
+
+# Task planning notes and artifact sources (local only)
+/plans/
