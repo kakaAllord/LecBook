@@ -164,8 +164,8 @@ export function UsersBoard() {
                   </TD>
                   <TD>
                     {user.role === "LECTURER" ? (
-                      user.modules.length > 0 ? (
-                        <span className="text-xs">{user.modules.map((m) => m.name).join(", ")}</span>
+                      user.teaching.length > 0 ? (
+                        <span className="text-xs">{user.teaching.map((l) => l.label).join(", ")}</span>
                       ) : (
                         <span className="text-xs text-amber-600 dark:text-amber-500">
                           No modules assigned

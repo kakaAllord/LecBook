@@ -1,6 +1,7 @@
 import { fail, handleApiError } from "@/lib/api-response";
 import { requireSession } from "@/lib/auth";
-import { assertAssessmentAccess, assertModuleAccess } from "@/lib/scope";
+import { assertAssessmentAccess } from "@/lib/scope";
+import { parseLevelParam } from "@/lib/validators/module";
 import { generateAssessmentReport, generateAllAssessmentsReport } from "@/lib/services/report.service";
 
 export const runtime = "nodejs";
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const assessmentId = searchParams.get("assessmentId");
     const moduleId = searchParams.get("moduleId");
+    const level = parseLevelParam(searchParams.get("level"));
     const courseId = searchParams.get("courseId") ?? undefined;
 
     if (assessmentId) {
@@ -30,12 +32,12 @@ export async function GET(request: Request) {
       const { pdf, filename } = await generateAssessmentReport(session, assessmentId);
       return pdfResponse(pdf, filename);
     }
-    if (moduleId) {
-      await assertModuleAccess(session, moduleId);
-      const { pdf, filename } = await generateAllAssessmentsReport(session, moduleId, courseId);
+    if (moduleId && level) {
+      // Scoped by the service, which resolves the class against the session.
+      const { pdf, filename } = await generateAllAssessmentsReport(session, moduleId, level, courseId);
       return pdfResponse(pdf, filename);
     }
-    return fail("assessmentId or moduleId is required", 422);
+    return fail("assessmentId, or moduleId and level, are required", 422);
   } catch (error) {
     return handleApiError(error);
   }

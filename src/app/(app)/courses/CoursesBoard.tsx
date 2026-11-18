@@ -34,6 +34,7 @@ export function CoursesBoard() {
     onSuccess: () => {
       toast.success("Course deleted");
       queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["modules"] });
       setDeleting(null);
     },
     onError: (error) => {
@@ -46,7 +47,9 @@ export function CoursesBoard() {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Courses</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Manage the courses you teach.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Each course is added once and comes with its own core module, taught from Level I to Level III.
+          </p>
         </div>
         <Button
           onClick={() => {
@@ -92,6 +95,7 @@ export function CoursesBoard() {
             <THead>
               <TR>
                 <TH>Name</TH>
+                <TH>Core module</TH>
                 <TH>Students</TH>
                 <TH className="text-right">Actions</TH>
               </TR>
@@ -100,6 +104,11 @@ export function CoursesBoard() {
               {data.items.map((course) => (
                 <TR key={course.id}>
                   <TD className="font-medium text-slate-900 dark:text-slate-100">{course.name}</TD>
+                  <TD>
+                    {course.coreModule
+                      ? `${course.coreModule.name}${course.coreModule.code ? ` (${course.coreModule.code})` : ""}`
+                      : "-"}
+                  </TD>
                   <TD>{course._count?.students ?? 0}</TD>
                   <TD>
                     <div className="flex justify-end gap-1">
@@ -134,7 +143,7 @@ export function CoursesBoard() {
         onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
         loading={deleteMutation.isPending}
         title="Delete course?"
-        description={`This will permanently delete "${deleting?.name}". Courses with students or assessments linked to them cannot be deleted.`}
+        description={`This will permanently delete "${deleting?.name}" and its core module. A course with students on it cannot be deleted.`}
       />
     </div>
   );

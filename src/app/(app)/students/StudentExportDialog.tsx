@@ -6,7 +6,7 @@ import dayjs from "dayjs";
 import { Copy, Download, Check } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiClientError } from "@/lib/api-client";
-import type { Module, Student } from "@/types";
+import type { Student, TeachingUnit } from "@/types";
 import type { StudentExportInput } from "@/lib/validators/export";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input, Label } from "@/components/ui/Input";
@@ -18,12 +18,12 @@ const DEFAULTS: StudentExportInput = {
   includeProfile: true,
   includeSummary: true,
   includeAttendance: true,
-  attendanceModuleIds: [],
+  attendanceClassKeys: [],
   attendanceFrom: "",
   attendanceTo: "",
   attendanceDetail: "summary",
   includeAssessments: true,
-  assessmentModuleIds: [],
+  assessmentClassKeys: [],
   includeMissingMarks: true,
 };
 
@@ -73,16 +73,17 @@ export function StudentExportDialog({
     }
   }, [open]);
 
-  const { data: modules } = useQuery({
-    queryKey: ["modules", "all"],
-    queryFn: () => api.get<Module[]>("/api/modules?all=true"),
+  const { data: units } = useQuery({
+    queryKey: ["teaching-units"],
+    queryFn: () => api.get<TeachingUnit[]>("/api/teaching-units"),
     enabled: open,
   });
 
-  // Only modules linked to this student's course can hold their records.
-  const relevantModules = (modules ?? []).filter((m) =>
-    student ? m.courses.some((c) => c.id === student.courseId) : false
-  );
+  // Only modules taught to this student's course can hold their records. Every
+  // level is offered, not just the current one, so earlier years can be exported.
+  const classOptions = (units ?? [])
+    .filter((u) => (student ? u.courses.some((c) => c.id === student.courseId) : false))
+    .map((u) => ({ id: u.key, label: u.label, hint: u.code ?? undefined }));
 
   const set = <K extends keyof StudentExportInput>(key: K, value: StudentExportInput[K]) =>
     setOptions((prev) => ({ ...prev, [key]: value }));
@@ -187,12 +188,9 @@ export function StudentExportDialog({
               <div>
                 <Label htmlFor="exp-att-modules">Modules</Label>
                 <CheckboxGroup
-                  options={relevantModules.map((m) => ({
-                    id: m.id,
-                    label: m.code ? `${m.name} (${m.code})` : m.name,
-                  }))}
-                  value={options.attendanceModuleIds ?? []}
-                  onChange={(ids) => set("attendanceModuleIds", ids)}
+                  options={classOptions}
+                  value={options.attendanceClassKeys ?? []}
+                  onChange={(ids) => set("attendanceClassKeys", ids)}
                   className="max-h-36"
                 />
                 <p className="mt-1 text-xs text-slate-400">Select none for every module.</p>
@@ -228,12 +226,9 @@ export function StudentExportDialog({
               <div>
                 <Label htmlFor="exp-ass-modules">Modules</Label>
                 <CheckboxGroup
-                  options={relevantModules.map((m) => ({
-                    id: m.id,
-                    label: m.code ? `${m.name} (${m.code})` : m.name,
-                  }))}
-                  value={options.assessmentModuleIds ?? []}
-                  onChange={(ids) => set("assessmentModuleIds", ids)}
+                  options={classOptions}
+                  value={options.assessmentClassKeys ?? []}
+                  onChange={(ids) => set("assessmentClassKeys", ids)}
                   className="max-h-36"
                 />
                 <p className="mt-1 text-xs text-slate-400">Select none for every module.</p>

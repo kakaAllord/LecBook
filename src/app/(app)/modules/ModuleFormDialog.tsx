@@ -3,16 +3,22 @@
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { moduleSchema, type ModuleInput } from "@/lib/validators/module";
 import { api, ApiClientError } from "@/lib/api-client";
-import type { Course, Module } from "@/types";
+import type { Module } from "@/types";
+import { LEVELS, levelLabel } from "@/lib/levels";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input, Label, FieldError } from "@/components/ui/Input";
-import { CheckboxGroup } from "@/components/ui/CheckboxGroup";
+import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 
+/**
+ * Creates and edits related modules — the ones that belong to a level and are
+ * taught to every course at it. A core module is made with its course and
+ * named after it, so for one of those only the code can be changed here.
+ */
 export function ModuleFormDialog({
   open,
   onClose,
@@ -24,12 +30,7 @@ export function ModuleFormDialog({
 }) {
   const queryClient = useQueryClient();
   const isEdit = Boolean(module);
-
-  const { data: courses } = useQuery({
-    queryKey: ["courses", "all"],
-    queryFn: () => api.get<Course[]>("/api/courses?all=true"),
-    enabled: open,
-  });
+  const isCore = module?.kind === "CORE";
 
   const {
     register,
@@ -43,25 +44,21 @@ export function ModuleFormDialog({
     if (open) {
       reset(
         module
-          ? {
-              name: module.name,
-              code: module.code ?? "",
-              level: module.level ?? "",
-              semester: module.semester ?? "",
-              academicYear: module.academicYear ?? "",
-              courseIds: module.courses.map((c) => c.id),
-            }
-          : { name: "", code: "", level: "", semester: "", academicYear: "", courseIds: [] }
+          ? { name: module.name, code: module.code ?? "", level: module.level ?? 1 }
+          : { name: "", code: "", level: 1 }
       );
     }
   }, [open, module, reset]);
 
   const mutation = useMutation({
     mutationFn: (data: ModuleInput) =>
-      isEdit ? api.patch(`/api/modules/${module!.id}`, data) : api.post("/api/modules", data),
+      isEdit
+        ? api.patch(`/api/modules/${module!.id}`, isCore ? { code: data.code } : data)
+        : api.post("/api/modules", data),
     onSuccess: () => {
       toast.success(isEdit ? "Module updated" : "Module created");
       queryClient.invalidateQueries({ queryKey: ["modules"] });
+      queryClient.invalidateQueries({ queryKey: ["teaching-units"] });
       onClose();
     },
     onError: (error) => {
@@ -70,49 +67,60 @@ export function ModuleFormDialog({
   });
 
   return (
-    <Dialog open={open} onClose={onClose} title={isEdit ? "Edit Module" : "New Module"}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={isCore ? "Edit Core Module" : isEdit ? "Edit Related Module" : "New Related Module"}
+    >
       <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
-        <div>
+        {isCore ? (
+          <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+            <strong>{module?.name}</strong> is the core module of the {module?.course?.name} course. It is taught
+            to that course at Level I, II and III and always carries the course&apos;s name — rename the course to
+            rename it. Only its code can be changed here.
+          </p>
+        ) : (
+          !isEdit && (
+            <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+              A related module belongs to one level and is taught to every course at that level. Core modules
+              are not created here: each course gets its own when the course is added.
+            </p>
+          )
+        )}
+
+        {/* Hidden fields keep a core module's name and level in the form so validation passes. */}
+        <div className={isCore ? "hidden" : undefined}>
           <Label htmlFor="name">Module Name</Label>
-          <Input id="name" placeholder="Database Systems" error={errors.name?.message} {...register("name")} />
+          <Input id="name" placeholder="Communication Skills" error={errors.name?.message} {...register("name")} />
           <FieldError message={errors.name?.message} />
         </div>
         <div>
           <Label htmlFor="code">Code (optional)</Label>
-          <Input id="code" placeholder="CS201" error={errors.code?.message} {...register("code")} />
+          <Input id="code" placeholder="CS101" error={errors.code?.message} {...register("code")} />
           <FieldError message={errors.code?.message} />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="level">Level</Label>
-            <Input id="level" placeholder="Level 5" error={errors.level?.message} {...register("level")} />
-            <FieldError message={errors.level?.message} />
-          </div>
-          <div>
-            <Label htmlFor="semester">Semester</Label>
-            <Input id="semester" placeholder="Semester II" error={errors.semester?.message} {...register("semester")} />
-            <FieldError message={errors.semester?.message} />
-          </div>
-        </div>
-        <div>
-          <Label htmlFor="academicYear">Academic Year</Label>
-          <Input id="academicYear" placeholder="2026" error={errors.academicYear?.message} {...register("academicYear")} />
-          <FieldError message={errors.academicYear?.message} />
-        </div>
-        <div>
-          <Label htmlFor="courseIds">Courses</Label>
+        <div className={isCore ? "hidden" : undefined}>
+          <Label htmlFor="level">Level</Label>
           <Controller
             control={control}
-            name="courseIds"
+            name="level"
             render={({ field }) => (
-              <CheckboxGroup
-                options={(courses ?? []).map((c) => ({ id: c.id, label: c.name }))}
-                value={field.value ?? []}
-                onChange={field.onChange}
-              />
+              <Select
+                id="level"
+                value={String(field.value ?? 1)}
+                onChange={(e) => field.onChange(Number(e.target.value))}
+                error={errors.level?.message}
+              >
+                {LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {levelLabel(level)}
+                  </option>
+                ))}
+              </Select>
             )}
           />
-          <FieldError message={errors.courseIds?.message} />
+          <p className="mt-1 text-xs text-slate-400">Every course at this level takes it.</p>
+          <FieldError message={errors.level?.message} />
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={onClose}>

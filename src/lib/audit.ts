@@ -21,6 +21,8 @@ export type AuditAction =
   | "student.update"
   | "student.delete"
   | "student.export"
+  | "student.level"
+  | "student.promote"
   | "course.create"
   | "course.update"
   | "course.delete"

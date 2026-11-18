@@ -99,7 +99,7 @@ export function LecturersBoard() {
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Lecturers</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            The lecturers you have added and the modules each of them teaches.
+            The lecturers you have added and what each of them teaches: a module, at a level, to which courses.
           </p>
         </div>
         <Button onClick={openAdd}>
@@ -138,7 +138,7 @@ export function LecturersBoard() {
         <EmptyState
           icon={GraduationCap}
           title="No lecturers yet"
-          description="Add a lecturer, tick the modules they teach, and send them the invite link."
+          description="Add a lecturer, choose the modules, levels and courses they teach, and send them the invite link."
           action={
             <Button onClick={openAdd}>
               <Plus className="h-4 w-4" /> Add lecturer
@@ -151,7 +151,7 @@ export function LecturersBoard() {
             <THead>
               <TR>
                 <TH>Name</TH>
-                <TH>Modules</TH>
+                <TH>Teaches</TH>
                 <TH>Last active</TH>
                 <TH>Status</TH>
                 <TH className="text-right">Actions</TH>
@@ -168,10 +168,15 @@ export function LecturersBoard() {
                     <div className="text-xs font-normal text-slate-400">{lecturer.email}</div>
                   </TD>
                   <TD>
-                    {lecturer.modules.length > 0 ? (
-                      <span className="text-xs">
-                        {lecturer.modules.map((m) => m.name).join(", ")}
-                      </span>
+                    {lecturer.teaching.length > 0 ? (
+                      <ul className="space-y-0.5 text-xs">
+                        {lecturer.teaching.map((line) => (
+                          <li key={line.key}>
+                            <span className="font-medium text-slate-700 dark:text-slate-200">{line.label}</span>
+                            <span className="text-slate-400"> · {line.courses.map((c) => c.name).join(", ")}</span>
+                          </li>
+                        ))}
+                      </ul>
                     ) : (
                       <span className="text-xs text-amber-600 dark:text-amber-500">None assigned</span>
                     )}
@@ -221,7 +226,7 @@ export function LecturersBoard() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        title="Edit details and modules"
+                        title="Edit details and what they teach"
                         onClick={() => {
                           setEditing(lecturer);
                           setFormOpen(true);

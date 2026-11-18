@@ -20,7 +20,9 @@ export function Badge({ color = "slate", children }: { color?: BadgeColor; child
 }
 
 export function studentStatusColor(status: string): BadgeColor {
-  return status === "ACTIVE" ? "emerald" : "slate";
+  if (status === "ACTIVE") return "emerald";
+  if (status === "COMPLETED") return "indigo";
+  return "slate";
 }
 
 export function attendanceStatusColor(status: string): BadgeColor {

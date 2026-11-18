@@ -19,7 +19,8 @@ type InviteDetails = {
   title: string | null;
   phone: string | null;
   staffId: string | null;
-  modules: { id: string; name: string; code: string | null }[];
+  /** One line per module and level, with the courses taught it. */
+  teaching: { label: string; code: string | null; courses: string[] }[];
   expiresAt: string;
 };
 
@@ -113,20 +114,23 @@ export function AcceptInviteForm({ token }: { token: string }) {
             ))}
           </dl>
 
-          {data.modules.length > 0 && (
+          {data.teaching.length > 0 && (
             <div className="mt-4">
               <p className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
                 <BookOpen className="h-3.5 w-3.5" /> Modules assigned to you
               </p>
               <ul className="space-y-1">
-                {data.modules.map((m) => (
+                {data.teaching.map((line) => (
                   <li
-                    key={m.id}
-                    className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300"
+                    key={line.label}
+                    className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300"
                   >
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    {m.name}
-                    {m.code ? ` (${m.code})` : ""}
+                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                    <span>
+                      {line.label}
+                      {line.code ? ` (${line.code})` : ""}
+                      <span className="block text-xs text-slate-400">{line.courses.join(", ")}</span>
+                    </span>
                   </li>
                 ))}
               </ul>

@@ -1,17 +1,24 @@
 "use client";
 
-import { useEffect } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { createUserSchema, type CreateUserInput } from "@/lib/validators/user";
 import { api, ApiClientError } from "@/lib/api-client";
-import type { ManagedUser, Module } from "@/types";
+import type { Course, ManagedUser, Module } from "@/types";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input, Label, FieldError } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { CheckboxGroup } from "@/components/ui/CheckboxGroup";
+import {
+  TeachingAssignmentsEditor,
+  newRow,
+  rowsFromTeaching,
+  rowsProblem,
+  rowsToAssignments,
+  type AssignmentRow,
+} from "./TeachingAssignmentsEditor";
 
 /**
  * The administrator fills in everything about the lecturer here — the account
@@ -37,11 +44,20 @@ export function LecturerFormDialog({
     queryFn: () => api.get<Module[]>("/api/modules?all=true"),
     enabled: open,
   });
+  const { data: courses } = useQuery({
+    queryKey: ["courses", "all"],
+    queryFn: () => api.get<Course[]>("/api/courses?all=true"),
+    enabled: open,
+  });
+
+  // What they teach is edited outside react-hook-form: each line's level and
+  // course choices depend on the module picked on that line.
+  const [rows, setRows] = useState<AssignmentRow[]>([]);
+  const [rowsError, setRowsError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
-    control,
     reset,
     formState: { errors },
   } = useForm<CreateUserInput>({ resolver: zodResolver(createUserSchema) });
@@ -57,7 +73,6 @@ export function LecturerFormDialog({
             title: lecturer.title ?? "",
             phone: lecturer.phone ?? "",
             staffId: lecturer.staffId ?? "",
-            moduleIds: lecturer.modules.map((m) => m.id),
           }
         : {
             name: "",
@@ -66,10 +81,33 @@ export function LecturerFormDialog({
             title: "",
             phone: "",
             staffId: "",
-            moduleIds: [],
           }
     );
   }, [open, lecturer, reset]);
+
+  // The teaching lines are reset while rendering whenever the dialog opens for
+  // a different person, the way React suggests for state derived from props.
+  const openedFor = open ? (lecturer?.id ?? "new") : null;
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  if (openedFor !== loadedFor) {
+    setLoadedFor(openedFor);
+    if (openedFor) {
+      setRows(lecturer ? rowsFromTeaching(lecturer.teaching) : [newRow()]);
+      setRowsError(null);
+    }
+  }
+
+  function submit(data: CreateUserInput) {
+    const problem = rowsProblem(rows, modules ?? []);
+    if (problem) {
+      setRowsError(problem);
+      return;
+    }
+    setRowsError(null);
+    const payload = { ...data, assignments: rowsToAssignments(rows) };
+    if (isEdit) updateMutation.mutate(payload);
+    else createMutation.mutate(payload);
+  }
 
   const onError = (error: unknown) => {
     toast.error(error instanceof ApiClientError ? error.message : "Something went wrong");
@@ -80,6 +118,7 @@ export function LecturerFormDialog({
       api.post<{ user: ManagedUser; inviteUrl: string }>("/api/admin/users", data),
     onSuccess: ({ user: created, inviteUrl }) => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["modules"] });
       onInviteCreated(created, inviteUrl);
       onClose();
     },
@@ -91,6 +130,7 @@ export function LecturerFormDialog({
       api.patch<ManagedUser>(`/api/admin/users/${lecturer!.id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      queryClient.invalidateQueries({ queryKey: ["modules"] });
       toast.success("Lecturer updated");
       onClose();
     },
@@ -106,16 +146,12 @@ export function LecturerFormDialog({
       size="lg"
       title={isEdit ? `Edit ${lecturer?.name}` : "Add a lecturer"}
     >
-      <form
-        onSubmit={handleSubmit((data) =>
-          isEdit ? updateMutation.mutate(data) : createMutation.mutate(data)
-        )}
-        className="space-y-4"
-      >
+      <form onSubmit={handleSubmit(submit)} className="space-y-4">
         {!isEdit && (
           <p className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
-            Enter their details and tick the modules they teach. You will get a one-time link to send
-            them; opening it, they set a password and their students are already waiting.
+            Enter their details, then each module they teach with the level and courses they teach it to.
+            You will get a one-time link to send them; opening it, they set a password and their students are
+            already waiting.
           </p>
         )}
 
@@ -156,23 +192,20 @@ export function LecturerFormDialog({
         </div>
 
         <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
-          <Label htmlFor="moduleIds">Modules they teach</Label>
-          <Controller
-            name="moduleIds"
-            control={control}
-            render={({ field }) => (
-              <CheckboxGroup
-                options={(modules ?? []).map((m) => ({
-                  id: m.id,
-                  label: m.code ? `${m.name} (${m.code})` : m.name,
-                }))}
-                value={field.value ?? []}
-                onChange={field.onChange}
-              />
-            )}
+          <Label>What they teach</Label>
+          <TeachingAssignmentsEditor
+            rows={rows}
+            onChange={(next) => {
+              setRows(next);
+              setRowsError(null);
+            }}
+            modules={modules ?? []}
+            courses={courses ?? []}
           />
-          <p className="mt-1 text-xs text-slate-400">
-            Every student on a course that runs these modules appears in their account automatically.
+          {rowsError && <FieldError message={rowsError} />}
+          <p className="mt-2 text-xs text-slate-400">
+            Their students are the active students at each chosen level on each chosen course. Nothing else
+            puts a student in front of them.
           </p>
         </div>
 

@@ -1,10 +1,13 @@
 import { z } from "zod";
+import { levelSchema } from "@/lib/validators/module";
 
 /** What a new assessment is marked out of unless the lecturer says otherwise. */
 export const DEFAULT_MAX_MARKS = 100;
 
+/** An assessment is set for a module at a level, to some of the courses taking it there. */
 export const assessmentSchema = z.object({
   moduleId: z.string().min(1, "Module is required"),
+  level: levelSchema,
   courseIds: z.array(z.string()).min(1, "Select at least one course"),
   name: z.string().min(1, "Assessment type/name is required").max(200),
   // Each assessment stands on its own total; the only bound is one that catches

@@ -6,7 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api-response";
 import { paginatedResult } from "@/lib/pagination";
 import type { Session } from "@/lib/auth";
-import type { CreateUserInput, UpdateUserInput, AcceptInviteInput } from "@/lib/validators/user";
+import type {
+  CreateUserInput,
+  UpdateUserInput,
+  AcceptInviteInput,
+  TeachingAssignmentInput,
+} from "@/lib/validators/user";
+import { toTeachingLines } from "@/lib/teaching-lines";
+import { levelLabel, levelsForModule, type Level } from "@/lib/levels";
 
 const INVITE_TTL_DAYS = 14;
 
@@ -24,9 +31,58 @@ export const userSelect = {
   loginCount: true,
   createdAt: true,
   createdBy: { select: { id: true, name: true, email: true } },
-  modules: { select: { id: true, name: true, code: true, courses: { select: { id: true, name: true } } } },
+  teachingAssignments: {
+    select: {
+      moduleId: true,
+      level: true,
+      module: { select: { name: true, code: true, kind: true } },
+      course: { select: { id: true, name: true } },
+    },
+  },
   _count: { select: { createdUsers: true, sessions: true } },
 } satisfies Prisma.UserSelect;
+
+type SelectedUser = Prisma.UserGetPayload<{ select: typeof userSelect }>;
+
+/** Replaces the stored one-row-per-course assignments with readable teaching lines. */
+function present(user: SelectedUser) {
+  const { teachingAssignments, ...rest } = user;
+  return { ...rest, teaching: toTeachingLines(teachingAssignments) };
+}
+
+/**
+ * Turns the form's lines (a module, a level, the courses) into stored rows,
+ * refusing anything the module cannot be taught as: a related module only at
+ * its own level, a core module only to its own course.
+ */
+async function expandAssignments(assignments: TeachingAssignmentInput[]) {
+  if (assignments.length === 0) return [];
+
+  const moduleIds = Array.from(new Set(assignments.map((a) => a.moduleId)));
+  const courseIds = Array.from(new Set(assignments.flatMap((a) => a.courseIds)));
+  const [modules, courseCount] = await Promise.all([
+    prisma.module.findMany({ where: { id: { in: moduleIds } } }),
+    prisma.course.count({ where: { id: { in: courseIds } } }),
+  ]);
+  if (modules.length !== moduleIds.length) throw new ApiError("One or more modules do not exist", 422);
+  if (courseCount !== courseIds.length) throw new ApiError("One or more courses do not exist", 422);
+  const byId = new Map(modules.map((m) => [m.id, m]));
+
+  const rows = new Map<string, { moduleId: string; level: number; courseId: string }>();
+  for (const a of assignments) {
+    const m = byId.get(a.moduleId)!;
+    if (!levelsForModule(m).includes(a.level as Level)) {
+      throw new ApiError(`${m.name} is not taught at ${levelLabel(a.level)}`, 422);
+    }
+    if (m.kind === "CORE" && a.courseIds.some((id) => id !== m.courseId)) {
+      throw new ApiError(`${m.name} is a core module and is taught only to its own course`, 422);
+    }
+    for (const courseId of a.courseIds) {
+      rows.set(`${a.moduleId}:${a.level}:${courseId}`, { moduleId: a.moduleId, level: a.level, courseId });
+    }
+  }
+  return Array.from(rows.values());
+}
 
 /**
  * Which accounts a session is allowed to manage.
@@ -79,7 +135,7 @@ export async function listUsers(
     prisma.user.count({ where }),
   ]);
 
-  return paginatedResult(items, total, page, pageSize);
+  return paginatedResult(items.map(present), total, page, pageSize);
 }
 
 export async function getManageableUser(session: Session, id: string) {
@@ -88,7 +144,7 @@ export async function getManageableUser(session: Session, id: string) {
     select: userSelect,
   });
   if (!user) throw new ApiError("User not found", 404);
-  return user;
+  return present(user);
 }
 
 /** Super admins may inspect any account, including ones they cannot edit. */
@@ -96,7 +152,7 @@ export async function getViewableUser(session: Session, id: string) {
   if (session.role === "SUPER_ADMIN") {
     const user = await prisma.user.findUnique({ where: { id }, select: userSelect });
     if (!user) throw new ApiError("User not found", 404);
-    return user;
+    return present(user);
   }
   return getManageableUser(session, id);
 }
@@ -127,12 +183,8 @@ export async function createUser(session: Session, data: CreateUserInput) {
     throw new ApiError("An account with this email already exists", 409);
   }
 
-  const moduleIds = data.moduleIds ?? [];
-
-  if (moduleIds.length > 0) {
-    const count = await prisma.module.count({ where: { id: { in: moduleIds } } });
-    if (count !== moduleIds.length) throw new ApiError("One or more modules do not exist", 422);
-  }
+  // Only lecturers teach; an administrator account carries no assignments.
+  const assignmentRows = data.role === "LECTURER" ? await expandAssignments(data.assignments ?? []) : [];
 
   const token = generateInviteToken();
 
@@ -146,7 +198,7 @@ export async function createUser(session: Session, data: CreateUserInput) {
       phone: data.phone || null,
       staffId: data.staffId || null,
       createdById: session.sub,
-      modules: { connect: moduleIds.map((id) => ({ id })) },
+      teachingAssignments: { create: assignmentRows },
       invites: {
         create: {
           token,
@@ -158,7 +210,7 @@ export async function createUser(session: Session, data: CreateUserInput) {
     select: userSelect,
   });
 
-  return { user, token };
+  return { user: present(user), token };
 }
 
 export async function updateUser(session: Session, id: string, data: UpdateUserInput) {
@@ -170,7 +222,10 @@ export async function updateUser(session: Session, id: string, data: UpdateUserI
     if (existing) throw new ApiError("An account with this email already exists", 409);
   }
 
-  return prisma.user.update({
+  const assignmentRows =
+    data.assignments !== undefined && target.role === "LECTURER" ? await expandAssignments(data.assignments) : null;
+
+  const user = await prisma.user.update({
     where: { id },
     data: {
       ...(data.name !== undefined ? { name: data.name } : {}),
@@ -180,10 +235,12 @@ export async function updateUser(session: Session, id: string, data: UpdateUserI
       ...(data.title !== undefined ? { title: data.title || null } : {}),
       ...(data.phone !== undefined ? { phone: data.phone || null } : {}),
       ...(data.staffId !== undefined ? { staffId: data.staffId || null } : {}),
-      ...(data.moduleIds ? { modules: { set: data.moduleIds.map((mid) => ({ id: mid })) } } : {}),
+      // The form sends the whole list, so it replaces what was there.
+      ...(assignmentRows ? { teachingAssignments: { deleteMany: {}, create: assignmentRows } } : {}),
     },
     select: userSelect,
   });
+  return present(user);
 }
 
 export async function setUserStatus(session: Session, id: string, active: boolean) {
@@ -193,11 +250,12 @@ export async function setUserStatus(session: Session, id: string, active: boolea
     data: { status: active ? "ACTIVE" : "INACTIVE" },
     select: userSelect,
   });
+  const result = present(user);
   // Deactivating cuts off existing sessions too, not just future sign-ins.
   if (!active) {
     await prisma.userSession.deleteMany({ where: { userId: id } });
   }
-  return user;
+  return result;
 }
 
 export async function deleteUser(session: Session, id: string) {
@@ -253,7 +311,14 @@ export async function getInviteByToken(token: string) {
           phone: true,
           staffId: true,
           status: true,
-          modules: { select: { id: true, name: true, code: true } },
+          teachingAssignments: {
+            select: {
+              moduleId: true,
+              level: true,
+              module: { select: { name: true, code: true, kind: true } },
+              course: { select: { id: true, name: true } },
+            },
+          },
         },
       },
     },
@@ -273,7 +338,7 @@ export async function acceptInvite(token: string, data: AcceptInviteInput) {
   const invite = await getInviteByToken(token);
   const passwordHash = await bcrypt.hash(data.password, 10);
 
-  const [, user] = await prisma.$transaction([
+  const [, accepted] = await prisma.$transaction([
     prisma.invite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } }),
     prisma.user.update({
       where: { id: invite.userId },
@@ -282,7 +347,7 @@ export async function acceptInvite(token: string, data: AcceptInviteInput) {
     }),
   ]);
 
-  return user;
+  return present(accepted);
 }
 
 export async function changeOwnPassword(session: Session, currentPassword: string, newPassword: string) {
@@ -300,8 +365,9 @@ export async function changeOwnPassword(session: Session, currentPassword: strin
 
 /** Everyone a super admin can drop into, grouped by the admin who added them. */
 export async function listAllUsersForSuperAdmin() {
-  return prisma.user.findMany({
+  const users = await prisma.user.findMany({
     orderBy: [{ role: "asc" }, { name: "asc" }],
     select: userSelect,
   });
+  return users.map(present);
 }

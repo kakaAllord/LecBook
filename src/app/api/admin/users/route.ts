@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       summary: `${session.name} added ${data.role === "ADMIN" ? "admin" : "lecturer"} ${user.name} (${user.email})`,
       metadata: {
         role: user.role,
-        modules: user.modules.map((m) => m.name),
+        teaching: user.teaching.map((l) => `${l.label}: ${l.courses.map((c) => c.name).join(", ")}`),
       },
     });
 

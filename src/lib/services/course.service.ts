@@ -28,7 +28,7 @@ export async function listCourses(
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      include: { _count: { select: { students: true } } },
+      include: { _count: { select: { students: true } }, coreModule: { select: { id: true, name: true, code: true } } },
     }),
     prisma.course.count({ where }),
   ]);
@@ -49,16 +49,44 @@ export async function getCourse(id: string) {
   return course;
 }
 
+/**
+ * A course arrives with its core module: the one module every student on it
+ * takes from Level I to Level III, carrying the course's own name.
+ */
 export async function createCourse(data: CourseInput) {
-  return prisma.course.create({ data });
+  return prisma.course.create({
+    data: { name: data.name, coreModule: { create: { name: data.name, kind: "CORE" } } },
+    include: { coreModule: true },
+  });
 }
 
+/** Renaming a course renames its core module with it, so the two never drift apart. */
 export async function updateCourse(id: string, data: CourseUpdateInput) {
   await getCourse(id);
-  return prisma.course.update({ where: { id }, data });
+  return prisma.course.update({
+    where: { id },
+    data: {
+      ...data,
+      ...(data.name !== undefined
+        ? { coreModule: { upsert: { create: { name: data.name, kind: "CORE" }, update: { name: data.name } } } }
+        : {}),
+    },
+    include: { coreModule: true },
+  });
 }
 
+/**
+ * A course with students on it cannot be deleted: their records hang off it.
+ * Deleting an empty course takes its core module, and that module's
+ * assessments, with it.
+ */
 export async function deleteCourse(id: string) {
-  await getCourse(id);
+  const course = await getCourse(id);
+  if (course._count.students > 0) {
+    throw new ApiError(
+      `${course.name} still has ${course._count.students} student${course._count.students === 1 ? "" : "s"}. Move or remove them first.`,
+      409
+    );
+  }
   await prisma.course.delete({ where: { id } });
 }

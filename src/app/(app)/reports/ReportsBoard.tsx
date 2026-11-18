@@ -6,7 +6,7 @@ import dayjs from "dayjs";
 import { FileText, Download } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
-import type { Assessment, Module, UserRole } from "@/types";
+import type { Assessment, TeachingUnit, UserRole } from "@/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -14,9 +14,10 @@ import { StudentReportCard } from "./StudentReportCard";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export function ReportsBoard({ role }: { role: UserRole }) {
-  const { data: modules } = useQuery({
-    queryKey: ["modules", "all"],
-    queryFn: () => api.get<Module[]>("/api/modules?all=true"),
+  // Every picker here offers a module at a level: "Electrical Installation Level I".
+  const { data: units } = useQuery({
+    queryKey: ["teaching-units"],
+    queryFn: () => api.get<TeachingUnit[]>("/api/teaching-units"),
   });
 
   return (
@@ -31,43 +32,50 @@ export function ReportsBoard({ role }: { role: UserRole }) {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <AttendanceReportCard modules={modules ?? []} />
-        <AssessmentReportCard modules={modules ?? []} />
-        <StudentReportCard modules={modules ?? []} />
+        <AttendanceReportCard units={units ?? []} />
+        <AssessmentReportCard units={units ?? []} />
+        <StudentReportCard units={units ?? []} />
       </div>
     </div>
   );
 }
 
+/** Query-string parameters naming a module at a level, plus an optional course. */
+function classParams(unit: TeachingUnit, courseId: string) {
+  const params = new URLSearchParams({ moduleId: unit.moduleId, level: String(unit.level) });
+  if (courseId) params.set("courseId", courseId);
+  return params;
+}
+
 function ModuleCourseSelects({
-  modules,
-  moduleId,
-  setModuleId,
+  units,
+  unitKey,
+  setUnitKey,
   courseId,
   setCourseId,
   idPrefix,
 }: {
-  modules: Module[];
-  moduleId: string;
-  setModuleId: (id: string) => void;
+  units: TeachingUnit[];
+  unitKey: string;
+  setUnitKey: (key: string) => void;
   courseId: string;
   setCourseId: (id: string) => void;
   idPrefix: string;
 }) {
-  const selectedModule = modules.find((m) => m.id === moduleId);
+  const selectedUnit = units.find((u) => u.key === unitKey);
   return (
     <>
       <div>
         <Label htmlFor={`${idPrefix}-module`}>Module</Label>
         <SearchableSelect
           id={`${idPrefix}-module`}
-          value={moduleId}
+          value={unitKey}
           onChange={(value) => {
-            setModuleId(value);
+            setUnitKey(value);
             setCourseId("");
           }}
           placeholder="Select a module..."
-          options={modules.map((m) => ({ value: m.id, label: m.name, hint: m.code ?? undefined }))}
+          options={units.map((u) => ({ value: u.key, label: u.label, hint: u.code ?? undefined }))}
         />
       </div>
       <div>
@@ -76,32 +84,32 @@ function ModuleCourseSelects({
           id={`${idPrefix}-course`}
           value={courseId}
           onChange={setCourseId}
-          disabled={!moduleId}
+          disabled={!selectedUnit}
           emptyOption="All courses in module"
-          options={(selectedModule?.courses ?? []).map((c) => ({ value: c.id, label: c.name }))}
+          options={(selectedUnit?.courses ?? []).map((c) => ({ value: c.id, label: c.name }))}
         />
       </div>
     </>
   );
 }
 
-function AttendanceReportCard({ modules }: { modules: Module[] }) {
-  const [moduleId, setModuleId] = useState("");
+function AttendanceReportCard({ units }: { units: TeachingUnit[] }) {
+  const [unitKey, setUnitKey] = useState("");
   const [courseId, setCourseId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const unit = units.find((u) => u.key === unitKey);
 
   const href = (() => {
-    if (!moduleId) return undefined;
-    const params = new URLSearchParams({ moduleId });
-    if (courseId) params.set("courseId", courseId);
+    if (!unit) return undefined;
+    const params = classParams(unit, courseId);
     if (from) params.set("from", from);
     if (to) params.set("to", to);
     return `/api/reports/attendance?${params.toString()}`;
   })();
 
   function handleClick(e: React.MouseEvent) {
-    if (!moduleId) {
+    if (!unit) {
       e.preventDefault();
       toast.error("Select a module first");
     }
@@ -119,9 +127,9 @@ function AttendanceReportCard({ modules }: { modules: Module[] }) {
           A tick-sheet register: one row per student, one column per date, with attendance totals.
         </p>
         <ModuleCourseSelects
-          modules={modules}
-          moduleId={moduleId}
-          setModuleId={setModuleId}
+          units={units}
+          unitKey={unitKey}
+          setUnitKey={setUnitKey}
           courseId={courseId}
           setCourseId={setCourseId}
           idPrefix="att"
@@ -146,26 +154,22 @@ function AttendanceReportCard({ modules }: { modules: Module[] }) {
   );
 }
 
-function AssessmentReportCard({ modules }: { modules: Module[] }) {
-  const [moduleId, setModuleId] = useState("");
+function AssessmentReportCard({ units }: { units: TeachingUnit[] }) {
+  const [unitKey, setUnitKey] = useState("");
   const [courseId, setCourseId] = useState("");
   const [assessmentId, setAssessmentId] = useState("");
+  const unit = units.find((u) => u.key === unitKey);
 
   const { data: assessments } = useQuery({
-    queryKey: ["assessments", moduleId, courseId, "report"],
-    queryFn: () => {
-      const params = new URLSearchParams();
-      if (moduleId) params.set("moduleId", moduleId);
-      if (courseId) params.set("courseId", courseId);
-      return api.get<Assessment[]>(`/api/assessments?${params.toString()}`);
-    },
-    enabled: Boolean(moduleId),
+    queryKey: ["assessments", unitKey, courseId, "report"],
+    queryFn: () => api.get<Assessment[]>(`/api/assessments?${classParams(unit!, courseId).toString()}`),
+    enabled: Boolean(unit),
   });
 
   const href =
     assessmentId === "__all__"
-      ? moduleId
-        ? `/api/reports/assessment?moduleId=${moduleId}${courseId ? `&courseId=${courseId}` : ""}`
+      ? unit
+        ? `/api/reports/assessment?${classParams(unit, courseId).toString()}`
         : undefined
       : assessmentId
         ? `/api/reports/assessment?assessmentId=${assessmentId}`
@@ -173,7 +177,7 @@ function AssessmentReportCard({ modules }: { modules: Module[] }) {
 
   function handleClick(e: React.MouseEvent) {
     if (assessmentId === "__all__") {
-      if (!moduleId) {
+      if (!unit) {
         e.preventDefault();
         toast.error("Select a module first to download all its assessments");
       }
@@ -198,10 +202,10 @@ function AssessmentReportCard({ modules }: { modules: Module[] }) {
           module (and optionally one course) to get a combined score summary.
         </p>
         <ModuleCourseSelects
-          modules={modules}
-          moduleId={moduleId}
-          setModuleId={(id) => {
-            setModuleId(id);
+          units={units}
+          unitKey={unitKey}
+          setUnitKey={(key) => {
+            setUnitKey(key);
             setAssessmentId("");
           }}
           courseId={courseId}
@@ -217,7 +221,7 @@ function AssessmentReportCard({ modules }: { modules: Module[] }) {
             id="ass-assessment"
             value={assessmentId}
             onChange={setAssessmentId}
-            disabled={!moduleId}
+            disabled={!unit}
             placeholder="Select an assessment..."
             options={[
               { value: "__all__", label: "All Assessments" },

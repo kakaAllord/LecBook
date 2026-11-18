@@ -1,4 +1,9 @@
-export type StudentStatus = "ACTIVE" | "INACTIVE";
+import type { TeachingLine } from "@/lib/teaching-lines";
+
+export type { TeachingLine };
+
+export type StudentStatus = "ACTIVE" | "INACTIVE" | "COMPLETED";
+export type ModuleKind = "CORE" | "RELATED";
 export type AttendanceStatus = "PRESENT" | "ABSENT";
 export type UserRole = "SUPER_ADMIN" | "ADMIN" | "LECTURER";
 export type UserStatus = "ACTIVE" | "INACTIVE" | "PENDING";
@@ -18,7 +23,8 @@ export type ManagedUser = {
   loginCount: number;
   createdAt: string;
   createdBy: { id: string; name: string; email: string } | null;
-  modules: { id: string; name: string; code: string | null; courses: { id: string; name: string }[] }[];
+  /** What a lecturer teaches, one line per module and level. */
+  teaching: TeachingLine[];
   _count: { createdUsers: number; sessions: number };
 };
 
@@ -32,7 +38,6 @@ export type CurrentUser = {
   title: string | null;
   createdAt: string;
   lastLoginAt: string | null;
-  modules: { id: string; name: string }[];
   impersonatedBy: { id: string; name: string } | null;
 };
 
@@ -57,20 +62,36 @@ export type Course = {
   id: string;
   name: string;
   createdAt: string;
-  modules?: Module[];
+  coreModule?: { id: string; name: string; code: string | null } | null;
   _count?: { students: number };
 };
 
+/**
+ * A CORE module belongs to one course (`course`) and runs at every level; a
+ * RELATED module belongs to one level (`level`) and runs for every course.
+ */
 export type Module = {
   id: string;
   name: string;
   code: string | null;
-  level: string | null;
-  semester: string | null;
-  academicYear: string | null;
+  kind: ModuleKind;
+  courseId: string | null;
+  level: number | null;
   createdAt: string;
-  courses: Course[];
-  _count?: { assessments: number };
+  course: { id: string; name: string } | null;
+  _count?: { assessments: number; attendance: number; assignments: number };
+};
+
+/** A module at one level, with the courses this account uses it for. */
+export type TeachingUnit = {
+  key: string;
+  moduleId: string;
+  name: string;
+  code: string | null;
+  kind: ModuleKind;
+  level: number;
+  label: string;
+  courses: { id: string; name: string }[];
 };
 
 export type Student = {
@@ -80,6 +101,7 @@ export type Student = {
   gender: string;
   phone: string | null;
   courseId: string;
+  level: number;
   status: StudentStatus;
   createdAt: string;
   course?: Course;
@@ -106,6 +128,8 @@ export type AttendanceDayEntry = {
 
 export type AttendanceForDate = {
   module: Module;
+  level: number;
+  label: string;
   courseIds: string[];
   date: string;
   students: AttendanceDayEntry[];
@@ -121,11 +145,14 @@ export type AttendanceHistoryEntry = {
 export type Assessment = {
   id: string;
   moduleId: string;
+  level: number;
+  /** "Electrical Installation Level I" */
+  label: string;
   name: string;
   maxMarks: number;
   date: string;
   createdAt: string;
-  module: Module;
+  module: Pick<Module, "id" | "name" | "code" | "kind">;
   courses: Course[];
   _count?: { marks: number };
 };

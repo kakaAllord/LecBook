@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { todayUtcDayStart } from "@/lib/date";
 import type { Session } from "@/lib/auth";
-import { getScopedCourseIds, getScopedModuleIds } from "@/lib/scope";
+import type { Prisma } from "@prisma/client";
+import { getAssignments, studentScopeWhere } from "@/lib/scope";
+import { LEVELS, moduleAtLevelLabel } from "@/lib/levels";
 import { getSettingsFor } from "@/lib/services/settings.service";
 
 function share(part: number, whole: number) {
@@ -23,7 +25,8 @@ export type AdminDashboard = {
   /** Setup work the admin still owes the system, each one a link away from fixed. */
   gaps: {
     modulesWithoutLecturer: number;
-    coursesWithoutModules: number;
+    /** Levels with no related module set up for them yet. */
+    levelsWithoutRelatedModules: number;
     coursesWithoutStudents: number;
     lecturersAwaitingSetup: number;
   };
@@ -67,7 +70,7 @@ export async function getAdminDashboard(): Promise<AdminDashboard> {
     todayAttendance,
     courseRows,
     modulesWithoutLecturer,
-    coursesWithoutModules,
+    relatedLevels,
     coursesWithoutStudents,
     lecturerRows,
   ] = await Promise.all([
@@ -82,14 +85,15 @@ export async function getAdminDashboard(): Promise<AdminDashboard> {
       select: { name: true, _count: { select: { students: true } } },
       orderBy: { name: "asc" },
     }),
-    prisma.module.count({ where: { lecturers: { none: {} } } }),
-    prisma.course.count({ where: { modules: { none: {} } } }),
+    prisma.module.count({ where: { assignments: { none: {} } } }),
+    prisma.module.findMany({ where: { kind: "RELATED" }, distinct: ["level"], select: { level: true } }),
     prisma.course.count({ where: { students: { none: {} } } }),
     prisma.user.findMany({
       where: { role: "LECTURER" },
-      select: { name: true, _count: { select: { modules: true } } },
+      select: { name: true, teachingAssignments: { distinct: ["moduleId", "level"], select: { id: true } } },
     }),
   ]);
+  const levelsWithoutRelatedModules = LEVELS.filter((l) => !relatedLevels.some((r) => r.level === l)).length;
 
   const attendance = { present: 0, absent: 0, total: 0 };
   for (const row of todayAttendance) {
@@ -105,7 +109,7 @@ export async function getAdminDashboard(): Promise<AdminDashboard> {
     .map((row) => ({ ...row, share: share(row.count, students) }));
 
   const busiestLecturers = lecturerRows
-    .map((l) => ({ label: l.name, count: l._count.modules }))
+    .map((l) => ({ label: l.name, count: l.teachingAssignments.length }))
     .filter((l) => l.count > 0)
     .sort((a, b) => b.count - a.count)
     .slice(0, 5)
@@ -125,7 +129,7 @@ export async function getAdminDashboard(): Promise<AdminDashboard> {
     studentsByCourse,
     gaps: {
       modulesWithoutLecturer,
-      coursesWithoutModules,
+      levelsWithoutRelatedModules,
       coursesWithoutStudents,
       lecturersAwaitingSetup: pendingLecturers,
     },
@@ -139,47 +143,81 @@ export async function getLecturerDashboard(session: Session): Promise<LecturerDa
   const weekStart = new Date(todayStart);
   weekStart.setUTCDate(weekStart.getUTCDate() - 6);
 
-  const [moduleIds, courseIds, settings] = await Promise.all([
-    getScopedModuleIds(session),
-    getScopedCourseIds(session),
+  const [rows, scopeWhere, settings] = await Promise.all([
+    getAssignments(session),
+    studentScopeWhere(session),
     getSettingsFor(session),
   ]);
 
-  const moduleFilter = moduleIds === null ? {} : { moduleId: { in: moduleIds } };
-  const studentFilter = courseIds === null ? {} : { courseId: { in: courseIds } };
+  // Everything below is about the lecturer's own classes: a module, at a level,
+  // for the courses they teach it to. Another lecturer teaching the same
+  // related module to other courses is not counted here.
+  const units = new Map<string, { moduleId: string; level: number; courseIds: string[] }>();
+  for (const r of rows ?? []) {
+    const key = `${r.moduleId}:${r.level}`;
+    if (!units.has(key)) units.set(key, { moduleId: r.moduleId, level: r.level, courseIds: [] });
+    units.get(key)!.courseIds.push(r.courseId);
+  }
+  const unitList = Array.from(units.values());
+  const nothing = { id: "__no_assignment__" };
+  const attendanceFilter: Prisma.AttendanceWhereInput =
+    rows === null
+      ? {}
+      : unitList.length === 0
+        ? nothing
+        : {
+            OR: unitList.map((u) => ({
+              moduleId: u.moduleId,
+              level: u.level,
+              student: { courseId: { in: u.courseIds } },
+            })),
+          };
+  const assessmentFilter: Prisma.AssessmentWhereInput =
+    rows === null
+      ? {}
+      : unitList.length === 0
+        ? nothing
+        : {
+            OR: unitList.map((u) => ({
+              moduleId: u.moduleId,
+              level: u.level,
+              courses: { some: { id: { in: u.courseIds } } },
+            })),
+          };
 
   const [students, moduleRows, assessments, sessionDays, todayRows, attendanceRows, recent] =
     await Promise.all([
-      prisma.student.count({ where: { ...studentFilter, status: "ACTIVE" } }),
+      prisma.student.count({ where: { AND: [scopeWhere, { status: "ACTIVE" }] } }),
       prisma.module.findMany({
-        where: moduleIds === null ? {} : { id: { in: moduleIds } },
+        where: rows === null ? {} : { id: { in: unitList.map((u) => u.moduleId) } },
         select: { id: true, name: true },
         orderBy: { name: "asc" },
       }),
-      prisma.assessment.count({ where: moduleFilter }),
+      prisma.assessment.count({ where: assessmentFilter }),
       prisma.attendance.findMany({
-        where: { ...moduleFilter, date: { gte: weekStart } },
-        distinct: ["moduleId", "date"],
+        where: { AND: [attendanceFilter, { date: { gte: weekStart } }] },
+        distinct: ["moduleId", "level", "date"],
         select: { date: true },
       }),
       prisma.attendance.groupBy({
         by: ["status"],
-        where: { ...moduleFilter, date: todayStart },
+        where: { AND: [attendanceFilter, { date: todayStart }] },
         _count: true,
       }),
       prisma.attendance.groupBy({
-        by: ["moduleId", "status"],
-        where: moduleFilter,
+        by: ["moduleId", "level", "status"],
+        where: attendanceFilter,
         _count: true,
       }),
       prisma.assessment.findMany({
-        where: moduleFilter,
+        where: assessmentFilter,
         orderBy: { date: "desc" },
         take: 5,
         select: {
           id: true,
           name: true,
           date: true,
+          level: true,
           maxMarks: true,
           module: { select: { name: true } },
           _count: { select: { marks: true } },
@@ -196,17 +234,22 @@ export async function getLecturerDashboard(session: Session): Promise<LecturerDa
   today.recorded = today.total > 0;
 
   const moduleNames = new Map(moduleRows.map((m) => [m.id, m.name]));
-  const perModule = new Map<string, { present: number; total: number }>();
+  const perClass = new Map<string, { label: string; present: number; total: number }>();
   for (const row of attendanceRows) {
-    const entry = perModule.get(row.moduleId) ?? { present: 0, total: 0 };
+    const key = `${row.moduleId}:${row.level}`;
+    const entry = perClass.get(key) ?? {
+      label: moduleAtLevelLabel(moduleNames.get(row.moduleId) ?? "Unknown module", row.level),
+      present: 0,
+      total: 0,
+    };
     entry.total += row._count;
     if (row.status === "PRESENT") entry.present += row._count;
-    perModule.set(row.moduleId, entry);
+    perClass.set(key, entry);
   }
 
-  const attendanceByModule = Array.from(perModule.entries())
-    .map(([moduleId, entry]) => ({
-      label: moduleNames.get(moduleId) ?? "Unknown module",
+  const attendanceByModule = Array.from(perClass.values())
+    .map((entry) => ({
+      label: entry.label,
       count: entry.present,
       share: share(entry.present, entry.total),
     }))
@@ -216,19 +259,19 @@ export async function getLecturerDashboard(session: Session): Promise<LecturerDa
     role: "LECTURER",
     totals: {
       students,
-      modules: moduleRows.length,
+      modules: rows === null ? moduleRows.length : unitList.length,
       assessments,
       sessionsThisWeek: sessionDays.length,
     },
     todayAttendance: today,
     attendanceByModule,
-    atRisk: await getStudentsBelowThreshold(moduleFilter, settings.attendanceThreshold),
+    atRisk: await getStudentsBelowThreshold(attendanceFilter, settings.attendanceThreshold),
     attendanceThreshold: settings.attendanceThreshold,
     recentAssessments: recent.map((a) => ({
       id: a.id,
       name: a.name,
       date: a.date.toISOString(),
-      moduleName: a.module.name,
+      moduleName: moduleAtLevelLabel(a.module.name, a.level),
       maxMarks: a.maxMarks,
       marksEntered: a._count.marks,
     })),
@@ -240,13 +283,10 @@ export async function getLecturerDashboard(session: Session): Promise<LecturerDa
  * pulled row by row, because a term of registers for a full course is a lot of
  * rows to count in JavaScript.
  */
-async function getStudentsBelowThreshold(
-  moduleFilter: { moduleId?: { in: string[] } },
-  threshold: number
-) {
+async function getStudentsBelowThreshold(attendanceFilter: Prisma.AttendanceWhereInput, threshold: number) {
   const rows = await prisma.attendance.groupBy({
     by: ["studentId", "status"],
-    where: moduleFilter,
+    where: attendanceFilter,
     _count: true,
   });
 

@@ -17,7 +17,6 @@ export async function GET() {
         title: true,
         createdAt: true,
         lastLoginAt: true,
-        modules: { select: { id: true, name: true } },
       },
     });
     return ok({

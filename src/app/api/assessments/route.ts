@@ -1,17 +1,18 @@
 import { ok, handleApiError } from "@/lib/api-response";
-import { requireSession } from "@/lib/auth";
+import { requireSession, assertNotImpersonating } from "@/lib/auth";
 import { assessmentSchema } from "@/lib/validators/assessment";
+import { parseLevelParam } from "@/lib/validators/module";
 import { listAssessments, createAssessment } from "@/lib/services/assessment.service";
-import { assertModuleAccess, getScopedModuleIds } from "@/lib/scope";
 
 export async function GET(request: Request) {
   try {
     const session = await requireSession();
-    const scopeModuleIds = await getScopedModuleIds(session);
     const { searchParams } = new URL(request.url);
-    const moduleId = searchParams.get("moduleId") ?? undefined;
-    const courseId = searchParams.get("courseId") ?? undefined;
-    const assessments = await listAssessments(moduleId, courseId, scopeModuleIds);
+    const assessments = await listAssessments(session, {
+      moduleId: searchParams.get("moduleId") ?? undefined,
+      level: parseLevelParam(searchParams.get("level")),
+      courseId: searchParams.get("courseId") ?? undefined,
+    });
     return ok(assessments);
   } catch (error) {
     return handleApiError(error);
@@ -21,10 +22,10 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const session = await requireSession();
-    const body = await request.json();
-    const data = assessmentSchema.parse(body);
-    await assertModuleAccess(session, data.moduleId);
-    const assessment = await createAssessment(data);
+    assertNotImpersonating(session);
+    const data = assessmentSchema.parse(await request.json());
+    // The service checks the session teaches this module at this level.
+    const assessment = await createAssessment(session, data);
     return ok(assessment, 201);
   } catch (error) {
     return handleApiError(error);

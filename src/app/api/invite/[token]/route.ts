@@ -2,6 +2,7 @@ import { ok, handleApiError } from "@/lib/api-response";
 import { acceptInviteSchema } from "@/lib/validators/user";
 import { getInviteByToken, acceptInvite } from "@/lib/services/user.service";
 import { recordAudit } from "@/lib/audit";
+import { toTeachingLines } from "@/lib/teaching-lines";
 
 type Params = { params: Promise<{ token: string }> };
 
@@ -17,7 +18,11 @@ export async function GET(_request: Request, { params }: Params) {
       title: invite.user.title,
       phone: invite.user.phone,
       staffId: invite.user.staffId,
-      modules: invite.user.modules,
+      teaching: toTeachingLines(invite.user.teachingAssignments).map((l) => ({
+        label: l.label,
+        code: l.code,
+        courses: l.courses.map((c) => c.name),
+      })),
       expiresAt: invite.expiresAt,
     });
   } catch (error) {

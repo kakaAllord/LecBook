@@ -14,7 +14,7 @@ import {
   type AssessmentFormInput,
 } from "@/lib/validators/assessment";
 import { api, ApiClientError } from "@/lib/api-client";
-import type { Assessment, Module } from "@/types";
+import type { Assessment, TeachingUnit } from "@/types";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input, Label, FieldError } from "@/components/ui/Input";
 import { CheckboxGroup } from "@/components/ui/CheckboxGroup";
@@ -24,31 +24,39 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 export function NewAssessmentDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const queryClient = useQueryClient();
   const router = useRouter();
-  const [moduleId, setModuleId] = useState("");
+  // The module is chosen at a level, so one picker sets both form fields.
+  const [unitKey, setUnitKey] = useState("");
 
-  const { data: modules } = useQuery({
-    queryKey: ["modules", "all"],
-    queryFn: () => api.get<Module[]>("/api/modules?all=true"),
+  const { data: units } = useQuery({
+    queryKey: ["teaching-units"],
+    queryFn: () => api.get<TeachingUnit[]>("/api/teaching-units"),
     enabled: open,
   });
 
-  const selectedModule = modules?.find((m) => m.id === moduleId);
+  const selectedUnit = units?.find((u) => u.key === unitKey);
 
   const {
     register,
     control,
     handleSubmit,
     reset,
-    watch,
     setValue,
     formState: { errors, isSubmitting },
   } = useForm<AssessmentFormInput, unknown, AssessmentInput>({ resolver: zodResolver(assessmentSchema) });
 
+  // Each opening starts from an empty picker. Done while rendering, the way
+  // React suggests for resetting state when a prop changes.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setUnitKey("");
+  }
+
   useEffect(() => {
     if (open) {
-      setModuleId("");
       reset({
         moduleId: "",
+        level: 1,
         courseIds: [],
         name: "",
         maxMarks: DEFAULT_MAX_MARKS,
@@ -57,11 +65,14 @@ export function NewAssessmentDialog({ open, onClose }: { open: boolean; onClose:
     }
   }, [open, reset]);
 
-  const watchedModuleId = watch("moduleId");
-  useEffect(() => {
-    setModuleId(watchedModuleId || "");
+  function chooseUnit(key: string) {
+    setUnitKey(key);
+    const unit = units?.find((u) => u.key === key);
+    setValue("moduleId", unit?.moduleId ?? "", { shouldValidate: Boolean(unit) });
+    setValue("level", unit?.level ?? 1);
+    // A different module or level has a different set of courses.
     setValue("courseIds", []);
-  }, [watchedModuleId, setValue]);
+  }
 
   const mutation = useMutation({
     mutationFn: (data: AssessmentInput) => api.post<Assessment>("/api/assessments", data),
@@ -81,19 +92,13 @@ export function NewAssessmentDialog({ open, onClose }: { open: boolean; onClose:
       <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
         <div>
           <Label htmlFor="moduleId">Module</Label>
-          <Controller
-            control={control}
-            name="moduleId"
-            render={({ field }) => (
-              <SearchableSelect
-                id="moduleId"
-                value={field.value ?? ""}
-                onChange={field.onChange}
-                error={errors.moduleId?.message}
-                placeholder="Select a module..."
-                options={(modules ?? []).map((m) => ({ value: m.id, label: m.name, hint: m.code ?? undefined }))}
-              />
-            )}
+          <SearchableSelect
+            id="moduleId"
+            value={unitKey}
+            onChange={chooseUnit}
+            error={errors.moduleId?.message}
+            placeholder="Select a module..."
+            options={(units ?? []).map((u) => ({ value: u.key, label: u.label, hint: u.code ?? undefined }))}
           />
           <FieldError message={errors.moduleId?.message} />
         </div>
@@ -105,7 +110,7 @@ export function NewAssessmentDialog({ open, onClose }: { open: boolean; onClose:
             name="courseIds"
             render={({ field }) => (
               <CheckboxGroup
-                options={(selectedModule?.courses ?? []).map((c) => ({
+                options={(selectedUnit?.courses ?? []).map((c) => ({
                   id: c.id,
                   label: c.name,
                 }))}

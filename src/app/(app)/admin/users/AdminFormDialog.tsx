@@ -44,7 +44,6 @@ export function AdminFormDialog({
       title: "",
       phone: "",
       staffId: "",
-      moduleIds: [],
     });
   }, [open, reset]);
 

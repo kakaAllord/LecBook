@@ -6,7 +6,7 @@ import dayjs from "dayjs";
 import { UserSearch, Download, Copy, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiClientError } from "@/lib/api-client";
-import type { Assessment, Module, Paginated, Student } from "@/types";
+import type { Assessment, Paginated, Student, TeachingUnit } from "@/types";
 import type { StudentExportInput } from "@/lib/validators/export";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
@@ -21,12 +21,13 @@ type ReportKind = "attendance" | "assessment";
  * about them: a register over a date range, or their marks. Leaving a module or
  * assessment selection empty means all of them, which is the common case.
  */
-export function StudentReportCard({ modules }: { modules: Module[] }) {
+export function StudentReportCard({ units }: { units: TeachingUnit[] }) {
   const [search, setSearch] = useState("");
   const [student, setStudent] = useState<Student | null>(null);
   const [kind, setKind] = useState<ReportKind>("attendance");
 
-  const [moduleIds, setModuleIds] = useState<string[]>([]);
+  // Modules at a level, as `moduleId:level` keys.
+  const [classKeys, setClassKeys] = useState<string[]>([]);
   const [assessmentIds, setAssessmentIds] = useState<string[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -43,29 +44,28 @@ export function StudentReportCard({ modules }: { modules: Module[] }) {
     enabled: search.trim().length > 1 && !student,
   });
 
-  // A student can only hold records for modules their course actually runs.
-  const relevantModules = student
-    ? modules.filter((m) => m.courses.some((c) => c.id === student.courseId))
-    : [];
+  // A student can only hold records for modules taught to their course. Every
+  // level is offered, so an earlier year's records can be reported too.
+  const relevantUnits = student ? units.filter((u) => u.courses.some((c) => c.id === student.courseId)) : [];
 
   const { data: assessments } = useQuery({
-    queryKey: ["assessments", "report-card", student?.courseId, moduleIds],
+    queryKey: ["assessments", "report-card", student?.courseId, classKeys],
     queryFn: async () => {
-      const selected = moduleIds.length > 0 ? moduleIds : relevantModules.map((m) => m.id);
+      const selected = classKeys.length > 0 ? relevantUnits.filter((u) => classKeys.includes(u.key)) : relevantUnits;
       const results = await Promise.all(
-        selected.map((moduleId) =>
+        selected.map((u) =>
           api.get<Assessment[]>(
-            `/api/assessments?moduleId=${moduleId}&courseId=${student!.courseId}`
+            `/api/assessments?moduleId=${u.moduleId}&level=${u.level}&courseId=${student!.courseId}`
           )
         )
       );
       return results.flat();
     },
-    enabled: kind === "assessment" && Boolean(student) && relevantModules.length > 0,
+    enabled: kind === "assessment" && Boolean(student) && relevantUnits.length > 0,
   });
 
   function reset() {
-    setModuleIds([]);
+    setClassKeys([]);
     setAssessmentIds([]);
     setFrom("");
     setTo("");
@@ -77,12 +77,12 @@ export function StudentReportCard({ modules }: { modules: Module[] }) {
       includeProfile: true,
       includeSummary: true,
       includeAttendance: wantsAttendance,
-      attendanceModuleIds: wantsAttendance ? moduleIds : [],
+      attendanceClassKeys: wantsAttendance ? classKeys : [],
       attendanceFrom: wantsAttendance ? from : "",
       attendanceTo: wantsAttendance ? to : "",
       attendanceDetail: "full",
       includeAssessments: !wantsAttendance,
-      assessmentModuleIds: wantsAttendance ? [] : moduleIds,
+      assessmentClassKeys: wantsAttendance ? [] : classKeys,
       assessmentIds: wantsAttendance ? [] : assessmentIds,
       includeMissingMarks: true,
     };
@@ -225,20 +225,17 @@ export function StudentReportCard({ modules }: { modules: Module[] }) {
             <div>
               <Label htmlFor="student-report-modules">Modules</Label>
               <CheckboxGroup
-                options={relevantModules.map((m) => ({
-                  id: m.id,
-                  label: m.code ? `${m.name} (${m.code})` : m.name,
-                }))}
-                value={moduleIds}
+                options={relevantUnits.map((u) => ({ id: u.key, label: u.label, hint: u.code ?? undefined }))}
+                value={classKeys}
                 onChange={(ids) => {
-                  setModuleIds(ids);
+                  setClassKeys(ids);
                   setAssessmentIds([]);
                 }}
               />
               <p className="mt-1 text-xs text-slate-400">
-                {moduleIds.length === 0
+                {classKeys.length === 0
                   ? "None ticked — the report covers all modules."
-                  : `${moduleIds.length} module${moduleIds.length === 1 ? "" : "s"} selected.`}
+                  : `${classKeys.length} module${classKeys.length === 1 ? "" : "s"} selected.`}
               </p>
             </div>
 
@@ -274,7 +271,7 @@ export function StudentReportCard({ modules }: { modules: Module[] }) {
                 <CheckboxGroup
                   options={(assessments ?? []).map((a) => ({
                     id: a.id,
-                    label: `${a.name} · ${a.module.name} · ${dayjs(a.date).format("DD MMM YYYY")}`,
+                    label: `${a.name} · ${a.label} · ${dayjs(a.date).format("DD MMM YYYY")}`,
                   }))}
                   value={assessmentIds}
                   onChange={setAssessmentIds}

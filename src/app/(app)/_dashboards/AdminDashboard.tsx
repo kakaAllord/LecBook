@@ -45,10 +45,10 @@ export function AdminDashboard() {
       fix: "Assign one",
     },
     {
-      label: "courses with no modules",
-      count: data.gaps.coursesWithoutModules,
+      label: "levels with no related modules",
+      count: data.gaps.levelsWithoutRelatedModules,
       href: "/modules",
-      fix: "Add modules",
+      fix: "Add related modules",
     },
     {
       label: "courses with no students",

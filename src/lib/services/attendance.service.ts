@@ -1,7 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { ApiError } from "@/lib/api-response";
 import { toUtcDayStart } from "@/lib/date";
+import type { Session } from "@/lib/auth";
 import type { SaveAttendanceInput } from "@/lib/validators/attendance";
+import { classRoster, resolveClass } from "@/lib/services/teaching.service";
+
+/**
+ * A register belongs to a module at a level, on a date. Who is on it comes from
+ * the class (see teaching.service): the active students at that level on the
+ * chosen courses, plus anyone already recorded on that day who has since moved
+ * up a level.
+ */
 
 function normalizeDate(date: string) {
   const day = toUtcDayStart(date);
@@ -11,66 +20,67 @@ function normalizeDate(date: string) {
   return day;
 }
 
-async function getModuleWithCourses(moduleId: string) {
-  const module_ = await prisma.module.findUnique({
-    where: { id: moduleId },
-    include: { courses: true },
-  });
-  if (!module_) throw new ApiError("Module not found", 404);
-  return module_;
-}
-
-export async function getAttendanceForDate(moduleId: string, courseIds: string[], date: string) {
+export async function getAttendanceForDate(
+  session: Session,
+  moduleId: string,
+  level: number,
+  courseIds: string[],
+  date: string
+) {
   const day = normalizeDate(date);
-  const module_ = await getModuleWithCourses(moduleId);
-
-  const moduleCourseIds = new Set(module_.courses.map((c) => c.id));
-  const invalidCourses = courseIds.filter((id) => !moduleCourseIds.has(id));
-  if (invalidCourses.length > 0) {
-    throw new ApiError("One or more selected courses are not linked to this module", 422);
-  }
-
-  const students = await prisma.student.findMany({
-    where: { courseId: { in: courseIds }, status: "ACTIVE" },
-    orderBy: { fullName: "asc" },
-  });
+  const cls = await resolveClass(session, moduleId, level, courseIds);
+  const scopeCourseIds = cls.courses.map((c) => c.id);
 
   const records = await prisma.attendance.findMany({
-    where: { date: day, moduleId, student: { courseId: { in: courseIds } } },
+    where: { date: day, moduleId, level: cls.level, student: { courseId: { in: scopeCourseIds } } },
   });
+  const students = await classRoster(
+    cls,
+    records.map((r) => r.studentId)
+  );
   const byStudent = new Map(records.map((r) => [r.studentId, r]));
 
   return {
-    module: module_,
-    courseIds,
+    module: cls.module,
+    level: cls.level,
+    label: cls.label,
+    courseIds: scopeCourseIds,
     date: day,
-    students: students.map((s) => ({
-      student: s,
-      attendance: byStudent.get(s.id)
-        ? {
-            id: byStudent.get(s.id)!.id,
-            status: byStudent.get(s.id)!.status,
-            remarks: byStudent.get(s.id)!.remarks,
-          }
-        : null,
-    })),
+    students: students.map((s) => {
+      const record = byStudent.get(s.id);
+      return {
+        student: s,
+        attendance: record ? { id: record.id, status: record.status, remarks: record.remarks } : null,
+      };
+    }),
   };
 }
 
-export async function saveAttendance(input: SaveAttendanceInput, recordedById?: string) {
+export async function saveAttendance(session: Session, input: SaveAttendanceInput) {
   const day = normalizeDate(input.date);
-  const module_ = await getModuleWithCourses(input.moduleId);
-  const moduleCourseIds = module_.courses.map((c) => c.id);
+  const cls = await resolveClass(session, input.moduleId, input.level);
+  const allowedCourseIds = cls.allowedCourses.map((c) => c.id);
 
   const studentIds = input.records.map((r) => r.studentId);
-  const students = await prisma.student.findMany({
-    where: { id: { in: studentIds }, courseId: { in: moduleCourseIds } },
-    select: { id: true, courseId: true },
-  });
-  const validIds = new Set(students.map((s) => s.id));
-  const invalid = input.records.filter((r) => !validIds.has(r.studentId));
-  if (invalid.length > 0) {
-    throw new ApiError("One or more students do not belong to a course linked to this module", 422);
+  const [students, existing] = await Promise.all([
+    prisma.student.findMany({
+      where: { id: { in: studentIds }, courseId: { in: allowedCourseIds } },
+      select: { id: true, courseId: true, level: true },
+    }),
+    prisma.attendance.findMany({
+      where: { moduleId: input.moduleId, date: day, studentId: { in: studentIds } },
+      select: { studentId: true },
+    }),
+  ]);
+
+  // A student belongs on this register when they are at its level now, or
+  // were already recorded on it before moving up.
+  const alreadyRecorded = new Set(existing.map((r) => r.studentId));
+  const validIds = new Set(
+    students.filter((s) => s.level === cls.level || alreadyRecorded.has(s.id)).map((s) => s.id)
+  );
+  if (input.records.some((r) => !validIds.has(r.studentId))) {
+    throw new ApiError(`One or more students are not in ${cls.label} on a course you can record`, 422);
   }
 
   await prisma.$transaction(
@@ -80,27 +90,29 @@ export async function saveAttendance(input: SaveAttendanceInput, recordedById?: 
         create: {
           studentId: r.studentId,
           moduleId: input.moduleId,
+          level: cls.level,
           date: day,
           status: r.status,
           remarks: r.remarks || null,
-          recordedById: recordedById ?? null,
+          recordedById: session.sub,
         },
         update: {
+          level: cls.level,
           status: r.status,
           remarks: r.remarks || null,
-          recordedById: recordedById ?? null,
+          recordedById: session.sub,
         },
       })
     )
   );
 
   const courseIds = Array.from(new Set(students.map((s) => s.courseId)));
-  return getAttendanceForDate(input.moduleId, courseIds, input.date);
+  return getAttendanceForDate(session, input.moduleId, cls.level, courseIds, input.date);
 }
 
 /**
- * Repairs a session that was saved against the wrong module, the wrong date, or
- * the wrong set of courses.
+ * Repairs a session that was saved against the wrong module, level, date, or
+ * set of courses.
  *
  * Attendance is keyed by (student, module, date), so "move" means rewriting that
  * key on the affected rows. Any row already sitting on the destination key is
@@ -108,59 +120,43 @@ export async function saveAttendance(input: SaveAttendanceInput, recordedById?: 
  * records removed — that is the fix for "the wrong course was marked attending".
  */
 export async function moveAttendanceSession(
+  session: Session,
   input: {
     moduleId: string;
+    level: number;
     date: string;
     courseIds?: string[];
     targetModuleId: string;
+    targetLevel: number;
     targetDate: string;
     targetCourseIds?: string[];
-  },
-  recordedById?: string
+  }
 ) {
   const sourceDay = normalizeDate(input.date);
   const targetDay = normalizeDate(input.targetDate);
-  const targetModule = await getModuleWithCourses(input.targetModuleId);
-
-  const sourceCourseIds =
-    input.courseIds && input.courseIds.length > 0
-      ? input.courseIds
-      : (await getModuleWithCourses(input.moduleId)).courses.map((c) => c.id);
+  const source = await resolveClass(session, input.moduleId, input.level, input.courseIds);
+  const target = await resolveClass(session, input.targetModuleId, input.targetLevel, input.targetCourseIds);
 
   const records = await prisma.attendance.findMany({
     where: {
       moduleId: input.moduleId,
+      level: source.level,
       date: sourceDay,
-      student: { courseId: { in: sourceCourseIds } },
+      student: { courseId: { in: source.courses.map((c) => c.id) } },
     },
     include: { student: { select: { id: true, courseId: true } } },
   });
 
   if (records.length === 0) {
-    throw new ApiError("There is no saved attendance for that module and date", 404);
+    throw new ApiError(`There is no saved attendance for ${source.label} on that date`, 404);
   }
 
-  // Students must belong to a course linked to the destination module, and to
-  // the caller's chosen subset of those courses when one was given.
-  const targetModuleCourseIds = new Set(targetModule.courses.map((c) => c.id));
-  const keepCourseIds =
-    input.targetCourseIds && input.targetCourseIds.length > 0
-      ? input.targetCourseIds.filter((id) => targetModuleCourseIds.has(id))
-      : Array.from(targetModuleCourseIds);
-
-  if (keepCourseIds.length === 0) {
-    throw new ApiError("None of the selected courses are linked to the destination module", 422);
-  }
-
-  const keep = new Set(keepCourseIds);
+  const keep = new Set(target.courses.map((c) => c.id));
   const moving = records.filter((r) => keep.has(r.student.courseId));
   const dropping = records.filter((r) => !keep.has(r.student.courseId));
 
   if (moving.length === 0) {
-    throw new ApiError(
-      "No students in this session belong to the destination module's courses",
-      422
-    );
+    throw new ApiError(`No students in this session are on a course that takes ${target.label}`, 422);
   }
 
   await prisma.$transaction([
@@ -182,8 +178,9 @@ export async function moveAttendanceSession(
         where: { id: record.id },
         data: {
           moduleId: input.targetModuleId,
+          level: target.level,
           date: targetDay,
-          recordedById: recordedById ?? record.recordedById,
+          recordedById: session.sub,
         },
       })
     ),
@@ -192,43 +189,45 @@ export async function moveAttendanceSession(
   return {
     moved: moving.length,
     removed: dropping.length,
-    module: targetModule,
+    module: target.module,
+    label: target.label,
     date: targetDay,
   };
 }
 
 /** Deletes a whole saved session — the escape hatch for one recorded in error. */
-export async function deleteAttendanceSession(input: {
-  moduleId: string;
-  date: string;
-  courseIds?: string[];
-}) {
+export async function deleteAttendanceSession(
+  session: Session,
+  input: { moduleId: string; level: number; date: string; courseIds?: string[] }
+) {
   const day = normalizeDate(input.date);
-  const module_ = await getModuleWithCourses(input.moduleId);
-  const courseIds =
-    input.courseIds && input.courseIds.length > 0
-      ? input.courseIds
-      : module_.courses.map((c) => c.id);
+  const cls = await resolveClass(session, input.moduleId, input.level, input.courseIds);
 
   const result = await prisma.attendance.deleteMany({
-    where: { moduleId: input.moduleId, date: day, student: { courseId: { in: courseIds } } },
+    where: {
+      moduleId: input.moduleId,
+      level: cls.level,
+      date: day,
+      student: { courseId: { in: cls.courses.map((c) => c.id) } },
+    },
   });
 
   if (result.count === 0) {
-    throw new ApiError("There is no saved attendance for that module and date", 404);
+    throw new ApiError(`There is no saved attendance for ${cls.label} on that date`, 404);
   }
 
-  return { deleted: result.count, module: module_, date: day };
+  return { deleted: result.count, module: cls.module, label: cls.label, date: day };
 }
 
 export async function getAttendanceHistory(
+  session: Session,
   moduleId: string,
+  level: number,
   courseIds: string[] | undefined,
   from?: string,
   to?: string
 ) {
-  const module_ = await getModuleWithCourses(moduleId);
-  const scopeCourseIds = courseIds && courseIds.length > 0 ? courseIds : module_.courses.map((c) => c.id);
+  const cls = await resolveClass(session, moduleId, level, courseIds);
 
   const dateFilter: { gte?: Date; lte?: Date } = {};
   if (from) dateFilter.gte = normalizeDate(from);
@@ -237,7 +236,8 @@ export async function getAttendanceHistory(
   const records = await prisma.attendance.findMany({
     where: {
       moduleId,
-      student: { courseId: { in: scopeCourseIds } },
+      level: cls.level,
+      student: { courseId: { in: cls.courses.map((c) => c.id) } },
       ...(from || to ? { date: dateFilter } : {}),
     },
     orderBy: { date: "desc" },

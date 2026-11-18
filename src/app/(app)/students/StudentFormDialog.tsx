@@ -13,6 +13,7 @@ import { Input, Label, FieldError } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { LEVELS, levelLabel } from "@/lib/levels";
 
 export function StudentFormDialog({
   open,
@@ -52,6 +53,7 @@ export function StudentFormDialog({
               gender: student.gender,
               phone: student.phone ?? "",
               courseId: student.courseId,
+              level: student.level,
               status: student.status,
             }
           : {
@@ -60,6 +62,8 @@ export function StudentFormDialog({
               gender: "",
               phone: "",
               courseId: defaultCourseId ?? "",
+              // New students start at Level I unless they join further on.
+              level: 1,
               status: "ACTIVE",
             }
       );
@@ -121,10 +125,12 @@ export function StudentFormDialog({
             <Select id="status" {...register("status")}>
               <option value="ACTIVE">Active</option>
               <option value="INACTIVE">Inactive</option>
+              <option value="COMPLETED">Completed</option>
             </Select>
           </div>
         </div>
 
+        <div className="grid gap-4 sm:grid-cols-[1fr_150px]">
         <div>
           <Label htmlFor="courseId">Course</Label>
           <Controller
@@ -142,6 +148,29 @@ export function StudentFormDialog({
             )}
           />
           <FieldError message={errors.courseId?.message} />
+        </div>
+        <div>
+          <Label htmlFor="level">Level</Label>
+          <Controller
+            control={control}
+            name="level"
+            render={({ field }) => (
+              <Select
+                id="level"
+                value={String(field.value ?? 1)}
+                onChange={(e) => field.onChange(Number(e.target.value))}
+                error={errors.level?.message}
+              >
+                {LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {levelLabel(level)}
+                  </option>
+                ))}
+              </Select>
+            )}
+          />
+          <FieldError message={errors.level?.message} />
+        </div>
         </div>
 
         <div className="flex justify-end gap-2 pt-2">

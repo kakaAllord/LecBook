@@ -124,7 +124,7 @@ export function MarksBoard() {
           <div>
             <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{data.assessment.name}</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              {data.assessment.module.name} · {data.assessment.courses.map((c) => c.name).join(", ")} ·{" "}
+              {data.assessment.label} · {data.assessment.courses.map((c) => c.name).join(", ")} ·{" "}
               {dayjs(data.assessment.date).format("DD MMM YYYY")} · marked out of {maxMarks}
             </p>
           </div>

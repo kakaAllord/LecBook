@@ -82,7 +82,7 @@ export const PROPOSAL: Proposal = {
         {
           type: "bullets",
           items: [
-            "Their students are already in the system. The administrator registers students and assigns each lecturer the modules they teach; a lecturer signs in and their class is simply there.",
+            "Their students are already in the system. The administrator registers each student on a course at their level of study and assigns each lecturer the modules they teach, at which level and to which courses; a lecturer signs in and their class is simply there.",
             "Attendance is marked in a few taps per session, on a phone or a computer, with everyone defaulted to present.",
             "Assessments and marks are recorded per module, each marked out of its own total, and a student's standing is the average of what they scored across them.",
             "A printable register with a signature column, so the paper trail and the digital record agree.",
@@ -93,10 +93,11 @@ export const PROPOSAL: Proposal = {
         {
           type: "bullets",
           items: [
-            "One place to register students, define courses and modules, and add lecturers.",
+            "One place to register students, define courses and modules, and add lecturers. A course is added once and brings its own core module, taught from Level I to Level III; related modules are set up once per level and shared by every course at it.",
+            "Students move up a level each year when they pass: the system shows who passed every module at their level, and the administrator confirms the promotion.",
             "Lecturers are onboarded by sending a one-time link — no shared passwords, and no administrator ever knows a lecturer's password. The administrator account itself is created the same way.",
             "Accounts can be deactivated the moment someone leaves, preventing that account from signing in again unless it is reactivated.",
-            "Printable attendance reports for any module, optional course and date range, plus assessment reports for one assessment or all assessments in a module.",
+            "Printable attendance reports for any module at a level, optional course and date range, plus assessment reports for one assessment or all assessments in a module at a level — set in Trebuchet MS with the college logo centred above its name.",
             "A complete record of any individual student — attendance per module, marks per assessment — filtered to whatever range is needed and exported as a PDF or copied as text.",
           ],
         },
@@ -105,7 +106,7 @@ export const PROPOSAL: Proposal = {
           type: "bullets",
           items: [
             "Administrators own the records: courses, modules, students, and the lecturer accounts. They do not take registers.",
-            "Lecturers own the teaching: registers, marks, their own reports and their own thresholds. They see only the students on courses that run their modules, and cannot edit a student record.",
+            "Lecturers own the teaching: registers, marks, their own reports and their own thresholds. They see only the students at the levels and on the courses they teach, and cannot edit a student record.",
             "We hold one operations account for support: it can open any account's screen in a workspace labelled read-only, switch account status on or off, and read the activity log.",
           ],
         },

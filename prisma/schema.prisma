@@ -20,33 +20,33 @@ enum UserStatus {
 }
 
 model User {
-  id        String     @id @default(cuid())
-  name      String
-  email     String     @unique
+  id                  String     @id @default(cuid())
+  name                String
+  email               String     @unique
   // Null until an invited user accepts their invite and sets a password.
-  password  String?
-  role      UserRole   @default(LECTURER)
-  status    UserStatus @default(ACTIVE)
-  phone     String?
-  title     String?
-  staffId   String?
+  password            String?
+  role                UserRole   @default(LECTURER)
+  status              UserStatus @default(ACTIVE)
+  phone               String?
+  title               String?
+  staffId             String?
   // The admin (or super admin) who created this account.
-  createdById String?
+  createdById         String?
   // A lecturer sets the bar for their own modules; null means the institution
   // default in Settings applies.
   attendanceThreshold Float?
   assessmentPassMark  Float?
-  lastLoginAt DateTime?
-  loginCount  Int      @default(0)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @default(now()) @updatedAt
+  lastLoginAt         DateTime?
+  loginCount          Int        @default(0)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @default(now()) @updatedAt
 
   createdBy    User?  @relation("UserCreator", fields: [createdById], references: [id], onDelete: SetNull)
   createdUsers User[] @relation("UserCreator")
 
-  // Lecturers are assigned modules; the courses (and therefore the students)
-  // they see are derived from those modules.
-  modules  Module[] @relation("ModuleLecturers")
+  // What a lecturer teaches: a module, at a level, to particular courses. The
+  // students they see are derived from these rows and nothing else.
+  teachingAssignments TeachingAssignment[]
 
   invites    Invite[]
   sessions   UserSession[]
@@ -58,14 +58,14 @@ model User {
 }
 
 model Invite {
-  id         String    @id @default(cuid())
-  token      String    @unique
-  userId     String
+  id          String    @id @default(cuid())
+  token       String    @unique
+  userId      String
   createdById String?
-  expiresAt  DateTime
-  acceptedAt DateTime?
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -98,22 +98,22 @@ model UserSession {
 }
 
 model AuditLog {
-  id     String  @id @default(cuid())
-  userId String?
+  id               String   @id @default(cuid())
+  userId           String?
   // Denormalized so the trail survives the actor being deleted.
-  actorName  String
-  actorEmail String
-  actorRole  UserRole
-  action     String
-  entity     String
-  entityId   String?
-  summary    String
-  metadata   Json?
-  ip         String?
-  userAgent  String?
+  actorName        String
+  actorEmail       String
+  actorRole        UserRole
+  action           String
+  entity           String
+  entityId         String?
+  summary          String
+  metadata         Json?
+  ip               String?
+  userAgent        String?
   // Set when a super admin performed this while viewing as another user.
   impersonatedById String?
-  createdAt  DateTime @default(now())
+  createdAt        DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
@@ -133,39 +133,70 @@ model Settings {
 }
 
 // A course is what a student enrols on when they arrive and stays with them
-// until they leave, so it carries nothing that changes term to term — the
-// stage a piece of teaching sits at belongs to the module, not to this.
+// until they leave, so it carries nothing that changes year to year. Adding a
+// course also adds its core module, which carries the same name.
 model Course {
   id        String   @id @default(cuid())
   name      String
   createdAt DateTime @default(now())
 
-  students    Student[]
-  modules     Module[]     @relation("ModuleCourses")
-  assessments Assessment[] @relation("AssessmentCourses")
+  students            Student[]
+  coreModule          Module?              @relation("CoreModule")
+  assessments         Assessment[]         @relation("AssessmentCourses")
+  teachingAssignments TeachingAssignment[]
 }
 
-// A module is the thing that runs in a given term: the same course is taught
-// through a different set of modules each semester. Level, semester and year
-// are optional because modules recorded before they existed have none.
-model Module {
-  id           String   @id @default(cuid())
-  name         String
-  code         String?
-  level        String?
-  semester     String?
-  academicYear String?
-  createdAt    DateTime @default(now())
+enum ModuleKind {
+  CORE
+  RELATED
+}
 
-  courses     Course[]     @relation("ModuleCourses")
+// Two kinds of module:
+// - CORE: one per course, named after it, taught to that course at every level
+//   from I to III. `courseId` is set and `level` is null.
+// - RELATED: belongs to one level and is taught to every course at that level.
+//   `level` is set (1–3) and `courseId` is null.
+// The database enforces that pairing with a check constraint.
+model Module {
+  id        String     @id @default(cuid())
+  name      String
+  code      String?
+  kind      ModuleKind @default(RELATED)
+  courseId  String?    @unique
+  level     Int?
+  createdAt DateTime   @default(now())
+
+  course      Course?              @relation("CoreModule", fields: [courseId], references: [id], onDelete: Cascade)
   attendance  Attendance[]
   assessments Assessment[]
-  lecturers   User[]       @relation("ModuleLecturers")
+  assignments TeachingAssignment[]
+}
+
+// One row per lecturer, module, level and course they teach it to. A lecturer
+// assigned a related module for "all courses" has one row per course; that
+// keeps every scope check a plain lookup.
+model TeachingAssignment {
+  id         String   @id @default(cuid())
+  lecturerId String
+  moduleId   String
+  level      Int
+  courseId   String
+  createdAt  DateTime @default(now())
+
+  lecturer User   @relation(fields: [lecturerId], references: [id], onDelete: Cascade)
+  module   Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([lecturerId, moduleId, level, courseId])
+  @@index([moduleId, level])
+  @@index([courseId, level])
 }
 
 enum StudentStatus {
   ACTIVE
   INACTIVE
+  // Passed Level III. Kept on the roll for their records, off every register.
+  COMPLETED
 }
 
 model Student {
@@ -175,6 +206,9 @@ model Student {
   gender             String
   phone              String?
   courseId           String
+  // Level of study, 1–3 (shown as I–III). Starts at I and moves up when the
+  // administrator promotes the students who passed.
+  level              Int           @default(1)
   status             StudentStatus @default(ACTIVE)
   createdAt          DateTime      @default(now())
 
@@ -183,6 +217,7 @@ model Student {
   marks      AssessmentMark[]
 
   @@index([courseId])
+  @@index([courseId, level])
 }
 
 enum AttendanceStatus {
@@ -191,16 +226,19 @@ enum AttendanceStatus {
 }
 
 model Attendance {
-  id        String           @id @default(cuid())
-  studentId String
-  moduleId  String
-  date      DateTime
-  status    AttendanceStatus
-  remarks   String?
+  id           String           @id @default(cuid())
+  studentId    String
+  moduleId     String
+  // The level the session was taught at. Recorded rather than read from the
+  // students so a register still means the same thing after they move up.
+  level        Int
+  date         DateTime
+  status       AttendanceStatus
+  remarks      String?
   // The lecturer/admin who last saved this record.
   recordedById String?
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @default(now()) @updatedAt
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @default(now()) @updatedAt
 
   student    Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
   module     Module  @relation(fields: [moduleId], references: [id], onDelete: Cascade)
@@ -209,12 +247,15 @@ model Attendance {
   @@unique([studentId, moduleId, date])
   @@index([date])
   @@index([moduleId])
+  @@index([moduleId, level])
   @@index([recordedById])
 }
 
 model Assessment {
   id        String   @id @default(cuid())
   moduleId  String
+  // The level it was set at; a core module is assessed separately at each.
+  level     Int
   name      String
   maxMarks  Float
   date      DateTime
@@ -225,6 +266,7 @@ model Assessment {
   marks   AssessmentMark[]
 
   @@index([moduleId])
+  @@index([moduleId, level])
 }
 
 model AssessmentMark {

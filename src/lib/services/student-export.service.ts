@@ -15,7 +15,8 @@ import { computeStanding, passes, roundPercentage } from "@/lib/grading";
 import { getSettingsFor } from "@/lib/services/settings.service";
 import type { Session } from "@/lib/auth";
 import { toUtcDayStart, toUtcDayEnd } from "@/lib/date";
-import { getScopedModuleIds } from "@/lib/scope";
+import { getAssignments } from "@/lib/scope";
+import { levelLabel, moduleAtLevelLabel, parseClassKey } from "@/lib/levels";
 import type { StudentExportInput } from "@/lib/validators/export";
 
 export type StudentExportData = {
@@ -29,6 +30,7 @@ export type StudentExportData = {
     phone: string | null;
     status: string;
     course: string;
+    level: string;
     registeredOn: string;
   };
   filters: {
@@ -75,18 +77,36 @@ function pct(part: number, whole: number) {
   return whole > 0 ? Math.round((part / whole) * 1000) / 10 : 0;
 }
 
+type ClassRef = { moduleId: string; level: number };
+
 /**
- * Narrows a chosen set of modules to the ones the reader is allowed to see.
- * `null` means no restriction; an empty array means nothing matches, which is
- * why the selection cannot simply fall back to "all modules" when it empties.
+ * Narrows a chosen set of classes (modules at a level) to the ones the reader
+ * may see. `null` means no restriction; an empty array means nothing matches,
+ * which is why the selection cannot simply fall back to "everything" when the
+ * intersection empties.
  */
-function scopedModuleIds(selected: string[], scope: string[] | null): string[] | null {
+function scopedClasses(selectedKeys: string[], scope: ClassRef[] | null): ClassRef[] | null {
+  const selected: ClassRef[] = [];
+  for (const key of selectedKeys) {
+    const parsed = parseClassKey(key);
+    if (parsed) selected.push(parsed);
+  }
   if (scope === null) return selected.length > 0 ? selected : null;
-  return selected.length > 0 ? selected.filter((id) => scope.includes(id)) : scope;
+  if (selected.length === 0) return scope;
+  return selected.filter((c) => scope.some((s) => s.moduleId === c.moduleId && s.level === c.level));
 }
 
-function moduleFilter(ids: string[] | null) {
-  return ids === null ? {} : { moduleId: { in: ids } };
+/** A `where` fragment matching records in any of the given classes. */
+function classFilter(classes: ClassRef[] | null) {
+  if (classes === null) return {};
+  if (classes.length === 0) return { id: "__nothing_selected__" };
+  return { OR: classes.map((c) => ({ moduleId: c.moduleId, level: c.level })) };
+}
+
+/** "Electrical Installation Level I (EI101)" */
+function classHeading(module_: { name: string; code: string | null }, level: number) {
+  const label = moduleAtLevelLabel(module_.name, level);
+  return module_.code ? `${label} (${module_.code})` : label;
 }
 
 /**
@@ -104,11 +124,12 @@ export async function buildStudentExport(
   ]);
   if (!student) throw new ApiError("Student not found", 404);
 
-  // A lecturer exports a student through the modules they teach, so the chosen
-  // modules are intersected with their assignment rather than trusted.
-  const scope = await getScopedModuleIds(session);
-  const attendanceModuleIds = scopedModuleIds(options.attendanceModuleIds ?? [], scope);
-  const assessmentModuleIds = scopedModuleIds(options.assessmentModuleIds ?? [], scope);
+  // A lecturer exports a student through the classes they teach, so the chosen
+  // ones are intersected with their assignments rather than trusted.
+  const rows = await getAssignments(session);
+  const scope = rows === null ? null : rows.map((r) => ({ moduleId: r.moduleId, level: r.level }));
+  const attendanceClasses = scopedClasses(options.attendanceClassKeys ?? [], scope);
+  const assessmentClasses = scopedClasses(options.assessmentClassKeys ?? [], scope);
   const assessmentIds = options.assessmentIds ?? [];
 
   const from = options.attendanceFrom ? toUtcDayStart(options.attendanceFrom) ?? undefined : undefined;
@@ -125,6 +146,7 @@ export async function buildStudentExport(
       phone: student.phone,
       status: student.status,
       course: student.course.name,
+      level: levelLabel(student.level),
       registeredOn: dayjs(student.createdAt).format("DD MMM YYYY"),
     },
     filters: {
@@ -132,8 +154,8 @@ export async function buildStudentExport(
         from || to
           ? `${from ? dayjs(from).format("DD MMM YYYY") : "start"} to ${to ? dayjs(to).format("DD MMM YYYY") : "today"}`
           : "All recorded dates",
-      attendanceModules: options.attendanceModuleIds?.length ? `${options.attendanceModuleIds.length} selected` : "All modules",
-      assessmentModules: options.assessmentModuleIds?.length ? `${options.assessmentModuleIds.length} selected` : "All modules",
+      attendanceModules: options.attendanceClassKeys?.length ? `${options.attendanceClassKeys.length} selected` : "All modules",
+      assessmentModules: options.assessmentClassKeys?.length ? `${options.assessmentClassKeys.length} selected` : "All modules",
       assessments: assessmentIds.length > 0 ? `${assessmentIds.length} selected` : "All assessments",
     },
     thresholds: { attendance: settings.attendanceThreshold, passMark: settings.assessmentPassMark },
@@ -143,16 +165,16 @@ export async function buildStudentExport(
     const records = await prisma.attendance.findMany({
       where: {
         studentId,
-        ...moduleFilter(attendanceModuleIds),
+        ...classFilter(attendanceClasses),
         ...(from || to ? { date: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
       },
       include: { module: true },
-      orderBy: [{ module: { name: "asc" } }, { date: "asc" }],
+      orderBy: [{ module: { name: "asc" } }, { level: "asc" }, { date: "asc" }],
     });
 
     const byModule = new Map<string, typeof records>();
     for (const record of records) {
-      const key = record.module.code ? `${record.module.name} (${record.module.code})` : record.module.name;
+      const key = classHeading(record.module, record.level);
       if (!byModule.has(key)) byModule.set(key, []);
       byModule.get(key)!.push(record);
     }
@@ -197,20 +219,18 @@ export async function buildStudentExport(
     const assessments = await prisma.assessment.findMany({
       where: {
         courses: { some: { id: student.courseId } },
-        ...moduleFilter(assessmentModuleIds),
+        ...classFilter(assessmentClasses),
         ...(assessmentIds.length > 0 ? { id: { in: assessmentIds } } : {}),
       },
       include: { module: true, marks: { where: { studentId } } },
-      orderBy: [{ module: { name: "asc" } }, { date: "asc" }],
+      orderBy: [{ module: { name: "asc" } }, { level: "asc" }, { date: "asc" }],
     });
 
     const byModule = new Map<string, typeof assessments>();
     for (const assessment of assessments) {
       const mark = assessment.marks[0];
       if (!mark && !options.includeMissingMarks) continue;
-      const key = assessment.module.code
-        ? `${assessment.module.name} (${assessment.module.code})`
-        : assessment.module.name;
+      const key = classHeading(assessment.module, assessment.level);
       if (!byModule.has(key)) byModule.set(key, []);
       byModule.get(key)!.push(assessment);
     }
@@ -269,6 +289,7 @@ export function renderStudentExportText(data: StudentExportData, options: Studen
     lines.push(`  Gender:          ${data.student.gender}`);
     lines.push(`  Phone:           ${data.student.phone || "-"}`);
     lines.push(`  Course:          ${data.student.course}`);
+    lines.push(`  Level:           ${data.student.level}`);
     lines.push(`  Status:          ${data.student.status}`);
     lines.push(`  Registered:      ${data.student.registeredOn}`);
     lines.push("");
@@ -372,6 +393,7 @@ export async function renderStudentExportPdf(data: StudentExportData, options: S
         ["Gender", data.student.gender],
         ["Phone", data.student.phone || "-"],
         ["Course", data.student.course],
+        ["Level", data.student.level],
         ["Status", data.student.status],
         ["Registered On", data.student.registeredOn],
       ];

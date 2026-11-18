@@ -87,17 +87,28 @@ shared menu is not an acceptable substitute for it.
   Users, Logs. Creates administrator accounts. Reads any account through
   read-only "view as". Owns no academic records.
 - **Administrator** (`ADMIN`) — the institution's records. Courses, modules,
-  students, lecturers, reports, institution settings. Takes no registers.
+  students (and their levels and promotion), lecturers, reports, institution
+  settings. Takes no registers.
 - **Lecturer** (`LECTURER`) — teaching. A read-only roll, attendance,
   assessments, reports, and their own attendance threshold and pass mark.
 
 Load-bearing facts, each of which a document has got wrong before:
 
-- A lecturer is assigned **modules**, never courses. Their courses and students
-  are derived from those modules (`src/lib/scope.ts`).
-- A **course is a name**. A student enrols on it once, on arrival, and stays on
-  it — it carries no level, semester or academic year. Those live on the
-  **module**, which is what is set up again for each term.
+- A **course is a name**, added once, with no level. Adding it creates its
+  **core module** of the same name; renaming it renames that module.
+- Modules are **CORE** (one per course, taught to it at Level I, II and III) or
+  **RELATED** (one level, taught to every course at it). There is no semester or
+  academic year on anything.
+- A **student has a level** (1–3, shown I–III), Level I by default. It moves up
+  only when the administrator promotes students who passed (every module marked
+  at that level reaching its lecturer's pass mark); from Level III they become
+  `COMPLETED`. Nothing promotes automatically.
+- A lecturer is assigned a **module at a level to particular courses**
+  (`TeachingAssignment`, one row per course). Their students are the active
+  students whose course and level match a row (`src/lib/scope.ts`). Access to a
+  module at a level is checked in `resolveClass` (`teaching.service.ts`).
+- Registers and assessments record the **level** they were taken at, and a
+  module is always shown with it: "Electrical Installation Level I".
 - The attendance threshold and pass mark live **on the lecturer**, falling back
   to the institution defaults in `Settings` (`getSettingsFor`).
 - Attendance is **Present or Absent**. There is no Late and no Excused.

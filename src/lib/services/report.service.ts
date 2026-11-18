@@ -14,6 +14,8 @@ import { toUtcDayStart, toUtcDayEnd } from "@/lib/date";
 import { computeStanding, passes, roundPercentage, scorePercentage } from "@/lib/grading";
 import { getSettingsFor } from "@/lib/services/settings.service";
 import type { Session } from "@/lib/auth";
+import { classCourseLabel, classRoster, resolveClass, type ResolvedClass } from "@/lib/services/teaching.service";
+import { moduleAtLevelLabel } from "@/lib/levels";
 
 // Landscape column widths at the 10pt report size. A date column fits "DD/MM"
 // with the cell padding either side; the rest is sized for its longest value.
@@ -28,37 +30,26 @@ const AVERAGE_COL_WIDTH = 60;
 const SIGNATURE_COL_WIDTH = 90;
 const STATUS_COL_WIDTH = 50;
 
-async function resolveModuleScope(moduleId: string, courseId?: string) {
-  const module_ = await prisma.module.findUnique({ where: { id: moduleId }, include: { courses: true } });
-  if (!module_) throw new ApiError("Module not found", 404);
-
-  if (courseId) {
-    const course = module_.courses.find((c) => c.id === courseId);
-    if (!course) throw new ApiError("Course is not linked to this module", 422);
-    return { module: module_, scopeCourses: [course] };
-  }
-  return { module: module_, scopeCourses: module_.courses };
-}
-
-function courseScopeLabel(scopeCourses: { name: string }[], allCourseCount: number) {
-  if (scopeCourses.length === 1) return scopeCourses[0].name;
-  if (scopeCourses.length === allCourseCount) return "All Courses";
-  return scopeCourses.map((c) => c.name).join(", ");
+/** "Electrical Installation Level I (EI101) · Electrical, Plumbing" */
+function classSubtitle(cls: ResolvedClass) {
+  return `${cls.label}${cls.module.code ? ` (${cls.module.code})` : ""} · ${classCourseLabel(cls)}`;
 }
 
 export async function generateAttendanceReport(
   session: Session,
   moduleId: string,
+  level: number,
   courseId?: string,
   from?: string,
   to?: string
 ) {
-  const [{ module: module_, scopeCourses }, settings] = await Promise.all([
-    resolveModuleScope(moduleId, courseId),
+  // Throws unless the session may report on this module at this level.
+  const [cls, settings] = await Promise.all([
+    resolveClass(session, moduleId, level, courseId ? [courseId] : undefined),
     getSettingsFor(session),
   ]);
 
-  const scopeCourseIds = scopeCourses.map((c) => c.id);
+  const scopeCourseIds = cls.courses.map((c) => c.id);
 
   const dateFilter: { gte?: Date; lte?: Date } = {};
   const fromDay = from ? toUtcDayStart(from) : null;
@@ -66,20 +57,20 @@ export async function generateAttendanceReport(
   if (fromDay) dateFilter.gte = fromDay;
   if (toDay) dateFilter.lte = toDay;
 
-  const [students, records] = await Promise.all([
-    prisma.student.findMany({
-      where: { courseId: { in: scopeCourseIds }, status: "ACTIVE" },
-      orderBy: { fullName: "asc" },
-    }),
-    prisma.attendance.findMany({
-      where: {
-        moduleId,
-        student: { courseId: { in: scopeCourseIds } },
-        ...(Object.keys(dateFilter).length ? { date: dateFilter } : {}),
-      },
-      orderBy: { date: "asc" },
-    }),
-  ]);
+  const records = await prisma.attendance.findMany({
+    where: {
+      moduleId,
+      level: cls.level,
+      student: { courseId: { in: scopeCourseIds } },
+      ...(Object.keys(dateFilter).length ? { date: dateFilter } : {}),
+    },
+    orderBy: { date: "asc" },
+  });
+  // Students recorded in range stay on the sheet even if they have moved up since.
+  const students = await classRoster(
+    cls,
+    Array.from(new Set(records.map((r) => r.studentId)))
+  );
 
   const dates = Array.from(new Set(records.map((r) => r.date.toISOString()))).sort();
 
@@ -95,7 +86,7 @@ export async function generateAttendanceReport(
       ? `${dayjs(from).format("DD MMM YYYY")} - ${dayjs(to).format("DD MMM YYYY")}`
       : "All recorded dates";
 
-  const subtitle = `${module_.name}${module_.code ? ` (${module_.code})` : ""} · ${courseScopeLabel(scopeCourses, module_.courses.length)}\nDate Range: ${rangeLabel}`;
+  const subtitle = `${classSubtitle(cls)}\nDate Range: ${rangeLabel}`;
 
   const pdf = await bufferPdf(
     (doc) => {
@@ -177,7 +168,7 @@ export async function generateAttendanceReport(
     { layout: "landscape" }
   );
 
-  return { pdf, filename: `attendance-${module_.name.replace(/\s+/g, "-")}-${dayjs().format("YYYYMMDD")}.pdf` };
+  return { pdf, filename: `attendance-${cls.label.replace(/\s+/g, "-")}-${dayjs().format("YYYYMMDD")}.pdf` };
 }
 
 export async function generateAssessmentReport(session: Session, assessmentId: string) {
@@ -204,7 +195,7 @@ export async function generateAssessmentReport(session: Session, assessmentId: s
   const lowest = total > 0 ? Math.min(...values) : 0;
 
   const courseLabel = assessment.courses.map((c) => c.name).join(", ");
-  const subtitle = `${assessment.module.name} · ${courseLabel}\n${assessment.name} · ${dayjs(assessment.date).format("DD MMM YYYY")}`;
+  const subtitle = `${moduleAtLevelLabel(assessment.module.name, assessment.level)} · ${courseLabel}\n${assessment.name} · ${dayjs(assessment.date).format("DD MMM YYYY")}`;
 
   // The sheet carries a percentage and a verdict as well as the raw mark: the
   // mark on its own says nothing now that every assessment sets its own total,
@@ -281,31 +272,31 @@ export async function generateAssessmentReport(session: Session, assessmentId: s
   };
 }
 
-export async function generateAllAssessmentsReport(session: Session, moduleId: string, courseId?: string) {
-  const [{ module: module_, scopeCourses }, settings] = await Promise.all([
-    resolveModuleScope(moduleId, courseId),
+export async function generateAllAssessmentsReport(
+  session: Session,
+  moduleId: string,
+  level: number,
+  courseId?: string
+) {
+  const [cls, settings] = await Promise.all([
+    resolveClass(session, moduleId, level, courseId ? [courseId] : undefined),
     getSettingsFor(session),
   ]);
-  const scopeCourseIds = scopeCourses.map((c) => c.id);
+  const scopeCourseIds = cls.courses.map((c) => c.id);
 
-  const [students, assessments] = await Promise.all([
-    prisma.student.findMany({
-      where: { courseId: { in: scopeCourseIds }, status: "ACTIVE" },
-      orderBy: { fullName: "asc" },
-    }),
-    prisma.assessment.findMany({
-      where: {
-        moduleId,
-        ...(courseId ? { courses: { some: { id: courseId } } } : {}),
-      },
-      orderBy: { date: "asc" },
-    }),
-  ]);
+  const assessments = await prisma.assessment.findMany({
+    where: { moduleId, level: cls.level, courses: { some: { id: { in: scopeCourseIds } } } },
+    orderBy: { date: "asc" },
+  });
 
   const assessmentIds = assessments.map((a) => a.id);
   const marks = assessmentIds.length
     ? await prisma.assessmentMark.findMany({ where: { assessmentId: { in: assessmentIds } } })
     : [];
+  const students = await classRoster(
+    cls,
+    Array.from(new Set(marks.map((m) => m.studentId)))
+  );
 
   const marksByStudent = new Map<string, Map<string, number>>();
   for (const m of marks) {
@@ -313,7 +304,7 @@ export async function generateAllAssessmentsReport(session: Session, moduleId: s
     marksByStudent.get(m.studentId)!.set(m.assessmentId, m.marks);
   }
 
-  const subtitle = `${module_.name}${module_.code ? ` (${module_.code})` : ""} · ${courseScopeLabel(scopeCourses, module_.courses.length)}\nAll Assessments (${assessments.length}) · Average of each assessment's score, pass mark ${settings.assessmentPassMark}%`;
+  const subtitle = `${classSubtitle(cls)}\nAll Assessments (${assessments.length}) · Average of each assessment's score, pass mark ${settings.assessmentPassMark}%`;
 
   const pdf = await bufferPdf(
     (doc) => {
@@ -404,5 +395,5 @@ export async function generateAllAssessmentsReport(session: Session, moduleId: s
     { layout: "landscape" }
   );
 
-  return { pdf, filename: `assessments-${module_.name.replace(/\s+/g, "-")}-${dayjs().format("YYYYMMDD")}.pdf` };
+  return { pdf, filename: `assessments-${cls.label.replace(/\s+/g, "-")}-${dayjs().format("YYYYMMDD")}.pdf` };
 }

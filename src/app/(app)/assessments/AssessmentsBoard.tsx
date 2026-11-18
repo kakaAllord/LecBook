@@ -7,7 +7,7 @@ import dayjs from "dayjs";
 import { Plus, Trash2, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiClientError } from "@/lib/api-client";
-import type { Assessment, Module } from "@/types";
+import type { Assessment, TeachingUnit } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -18,23 +18,26 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export function AssessmentsBoard() {
   const queryClient = useQueryClient();
-  const [moduleId, setModuleId] = useState("");
+  const [unitKey, setUnitKey] = useState("");
   const [courseId, setCourseId] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [deleting, setDeleting] = useState<Assessment | null>(null);
 
-  const { data: modules } = useQuery({
-    queryKey: ["modules", "all"],
-    queryFn: () => api.get<Module[]>("/api/modules?all=true"),
+  const { data: units } = useQuery({
+    queryKey: ["teaching-units"],
+    queryFn: () => api.get<TeachingUnit[]>("/api/teaching-units"),
   });
 
-  const selectedModule = modules?.find((m) => m.id === moduleId);
+  const selectedUnit = units?.find((u) => u.key === unitKey);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["assessments", moduleId, courseId],
+    queryKey: ["assessments", unitKey, courseId],
     queryFn: () => {
       const params = new URLSearchParams();
-      if (moduleId) params.set("moduleId", moduleId);
+      if (selectedUnit) {
+        params.set("moduleId", selectedUnit.moduleId);
+        params.set("level", String(selectedUnit.level));
+      }
       if (courseId) params.set("courseId", courseId);
       return api.get<Assessment[]>(`/api/assessments?${params.toString()}`);
     },
@@ -68,22 +71,22 @@ export function AssessmentsBoard() {
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <SearchableSelect
-          value={moduleId}
+          value={unitKey}
           onChange={(value) => {
-            setModuleId(value);
+            setUnitKey(value);
             setCourseId("");
           }}
           className="w-full sm:max-w-xs"
           emptyOption="All modules"
-          options={(modules ?? []).map((m) => ({ value: m.id, label: m.name, hint: m.code ?? undefined }))}
+          options={(units ?? []).map((u) => ({ value: u.key, label: u.label, hint: u.code ?? undefined }))}
         />
         <SearchableSelect
           value={courseId}
           onChange={setCourseId}
           className="w-full sm:max-w-xs"
-          disabled={!moduleId}
+          disabled={!selectedUnit}
           emptyOption="All courses"
-          options={(selectedModule?.courses ?? []).map((c) => ({ value: c.id, label: c.name }))}
+          options={(selectedUnit?.courses ?? []).map((c) => ({ value: c.id, label: c.name }))}
         />
       </div>
 
@@ -121,7 +124,7 @@ export function AssessmentsBoard() {
                   </Link>{" "}
                   <span className="text-xs text-slate-400">(out of {assessment.maxMarks})</span>
                 </TD>
-                <TD>{assessment.module.name}</TD>
+                <TD>{assessment.label}</TD>
                 <TD>{assessment.courses.map((c) => c.name).join(", ")}</TD>
                 <TD>{dayjs(assessment.date).format("DD MMM YYYY")}</TD>
                 <TD>{assessment._count?.marks ?? 0}</TD>

@@ -7,7 +7,7 @@ import dayjs from "dayjs";
 import { ArrowLeft, Pencil, Wrench, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiClientError } from "@/lib/api-client";
-import type { AttendanceHistoryEntry, Module } from "@/types";
+import type { AttendanceHistoryEntry, TeachingUnit } from "@/types";
 import { Input, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
@@ -19,43 +19,48 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export function HistoryBoard() {
   const queryClient = useQueryClient();
-  const [moduleId, setModuleId] = useState("");
+  const [unitKey, setUnitKey] = useState("");
   const [courseId, setCourseId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [fixing, setFixing] = useState<SessionRef | null>(null);
   const [deleting, setDeleting] = useState<SessionRef | null>(null);
 
-  const { data: modules } = useQuery({
-    queryKey: ["modules", "all"],
-    queryFn: () => api.get<Module[]>("/api/modules?all=true"),
+  const { data: units } = useQuery({
+    queryKey: ["teaching-units"],
+    queryFn: () => api.get<TeachingUnit[]>("/api/teaching-units"),
   });
 
-  const selectedModule = modules?.find((m) => m.id === moduleId);
+  const selectedUnit = units?.find((u) => u.key === unitKey);
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ["attendance-history", moduleId, courseId, from, to],
+    queryKey: ["attendance-history", unitKey, courseId, from, to],
     queryFn: () => {
-      const params = new URLSearchParams({ moduleId });
+      const params = new URLSearchParams({ moduleId: selectedUnit!.moduleId, level: String(selectedUnit!.level) });
       if (courseId) params.set("courseIds", courseId);
       if (from) params.set("from", from);
       if (to) params.set("to", to);
       return api.get<AttendanceHistoryEntry[]>(`/api/attendance/history?${params.toString()}`);
     },
-    enabled: Boolean(moduleId),
+    enabled: Boolean(selectedUnit),
   });
 
-  const scopedCourseIds = courseId ? [courseId] : selectedModule?.courses.map((c) => c.id) ?? [];
+  const scopedCourseIds = courseId ? [courseId] : selectedUnit?.courses.map((c) => c.id) ?? [];
 
   const editHref = (date: string) => {
-    const params = new URLSearchParams({ moduleId, date: dayjs(date).format("YYYY-MM-DD") });
+    const params = new URLSearchParams({
+      moduleId: selectedUnit?.moduleId ?? "",
+      level: String(selectedUnit?.level ?? ""),
+      date: dayjs(date).format("YYYY-MM-DD"),
+    });
     params.set("courseIds", scopedCourseIds.join(","));
     return `/attendance?${params.toString()}`;
   };
 
   const sessionRef = (entry: AttendanceHistoryEntry): SessionRef => ({
-    moduleId,
-    moduleName: selectedModule?.name ?? "this module",
+    moduleId: selectedUnit!.moduleId,
+    level: selectedUnit!.level,
+    label: selectedUnit?.label ?? "this module",
     date: entry.date,
     courseIds: scopedCourseIds,
     total: entry.total,
@@ -65,6 +70,7 @@ export function HistoryBoard() {
     mutationFn: (target: SessionRef) =>
       api.delete<{ deleted: number }>("/api/attendance/session", {
         moduleId: target.moduleId,
+        level: target.level,
         date: target.date,
         courseIds: target.courseIds,
       }),
@@ -93,17 +99,17 @@ export function HistoryBoard() {
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="sm:w-64">
+        <div className="sm:w-80">
           <Label htmlFor="module">Module</Label>
           <SearchableSelect
             id="module"
-            value={moduleId}
+            value={unitKey}
             onChange={(value) => {
-              setModuleId(value);
+              setUnitKey(value);
               setCourseId("");
             }}
             placeholder="Select a module..."
-            options={(modules ?? []).map((m) => ({ value: m.id, label: m.name, hint: m.code ?? undefined }))}
+            options={(units ?? []).map((u) => ({ value: u.key, label: u.label, hint: u.code ?? undefined }))}
           />
         </div>
         <div className="sm:w-56">
@@ -112,9 +118,9 @@ export function HistoryBoard() {
             id="course"
             value={courseId}
             onChange={setCourseId}
-            disabled={!moduleId}
+            disabled={!selectedUnit}
             emptyOption="All courses"
-            options={(selectedModule?.courses ?? []).map((c) => ({ value: c.id, label: c.name }))}
+            options={(selectedUnit?.courses ?? []).map((c) => ({ value: c.id, label: c.name }))}
           />
         </div>
         <div className="sm:w-44">
@@ -127,7 +133,7 @@ export function HistoryBoard() {
         </div>
       </div>
 
-      {!moduleId ? (
+      {!selectedUnit ? (
         <EmptyState title="Select a module" description="Choose a module above to view its attendance history." />
       ) : isLoading || isFetching ? (
         <LoadingSpinner />
@@ -188,7 +194,7 @@ export function HistoryBoard() {
         open={Boolean(fixing)}
         onClose={() => setFixing(null)}
         session={fixing}
-        modules={modules ?? []}
+        units={units ?? []}
       />
 
       <ConfirmDialog
@@ -197,7 +203,7 @@ export function HistoryBoard() {
         onConfirm={() => deleting && deleteMutation.mutate(deleting)}
         loading={deleteMutation.isPending}
         title="Delete this session?"
-        description={`This permanently removes all ${deleting?.total ?? 0} attendance records saved for ${deleting?.moduleName} on ${deleting ? dayjs(deleting.date).format("DD MMM YYYY") : ""}.`}
+        description={`This permanently removes all ${deleting?.total ?? 0} attendance records saved for ${deleting?.label} on ${deleting ? dayjs(deleting.date).format("DD MMM YYYY") : ""}.`}
       />
     </div>
   );

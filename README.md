@@ -17,7 +17,7 @@ A single Next.js application (frontend + backend in one project, one deploy) for
 
 ```
 prisma/
-  schema.prisma        Data model (User, Invite, UserSession, AuditLog, Settings, Course, Module, Student, Attendance, Assessment, AssessmentMark)
+  schema.prisma        Data model (User, Invite, UserSession, AuditLog, Settings, Course, Module, TeachingAssignment, Student, Attendance, Assessment, AssessmentMark)
   seed.ts               Full seed script (all three account roles + sample courses/modules/students/assessments/attendance)
   seed-credentials.ts    Credentials-only seed (used standalone by `npm run db:seed:creds`, and by seed.ts)
   clear.ts               Wipes academic/demo data while retaining accounts and operational history (used by `npm run db:clear`)
@@ -148,19 +148,20 @@ database.
 
 ### Administrator — the institution's records
 
-- **Dashboard** — students, courses, modules and lecturers, plus the setup gaps still open (modules with no lecturer, courses with no modules or students, invites not yet opened), each linking to the page that closes it.
-- **Courses / Modules** — full CRUD with search. A course is a name and nothing else: a student enrols on it once, on arrival, and stays on it. The level, semester and academic year sit on the **module**, which is what is registered again each term and is linked to the courses that run it.
-- **Students** — registration with unique registration numbers, search, filters and CRUD, plus configurable per-student PDF/text exports. Registration is the administrator's job; lecturers never register anyone.
-- **Lecturers** — add a lecturer, tick the modules they teach, and copy the one-time invite link to send them. Edit assignments, issue a replacement invite while setup is pending, activate/deactivate access, or delete the account.
+- **Dashboard** — students, courses, modules and lecturers, plus the setup gaps still open (modules with no lecturer, levels with no related module, courses with no students, invites not yet opened), each linking to the page that closes it.
+- **Courses** — a course is a name, added once, with no level. Adding one also creates its **core module**, carrying the same name; renaming the course renames it. A course with students on it cannot be deleted.
+- **Modules** — two kinds. A **core** module is one per course and is taught to that course at Level I, II and III; it is made with its course and only its code is edited here. A **related** module belongs to one level (I, II or III) and is taught to every course at that level; these are created here. A module with registers or assessments cannot be deleted, and a related module's level cannot change once it has them.
+- **Students** — registration with unique registration numbers, course and **level of study** (Level I by default), search, course/level/status filters and CRUD, plus configurable per-student PDF/text exports. Tick students to **set their level** in bulk. **Promote students** lists everyone active at a level with whether they passed — every module they were marked in at that level reaching its lecturer's pass mark — ticks those who passed, and moves the confirmed ones up a level, or to **Completed** from Level III. The academic year (Level I and II from January; Level III June to the following July; two semesters each) is shown there as guidance; nothing is promoted automatically.
+- **Lecturers** — add a lecturer and say what they teach, one line per module: the module, the level(s) and the course(s), with "Select all" for both. A core module is taught only to its own course; a related module only at its own level. Then copy the one-time invite link to send them. Edit assignments, issue a replacement invite while setup is pending, activate/deactivate access, or delete the account.
 - **Reports** — attendance registers, assessment sheets, and a per-student report.
 - **Settings** — institution name and logo, shown in the app and printed at the top of academic report PDFs.
 
 ### Lecturer — teaching
 
-- **Dashboard** — their students, their modules, whether today's register is in, attendance per module, and who has fallen below their attendance bar.
-- **Students** — read-only roll of everyone on a course that runs one of their modules.
-- **Attendance** — select a module, the attending course(s) and a date; mark each active student Present/Absent; save (upserts, so re-saving edits rather than duplicates); then edit, move or delete an already-saved session from its history.
-- **Assessments & Marks** — create an assessment against one of their modules and one or more of its courses, each marked out of its own total (100 by default), then enter or revisit marks per student. The list holds their own modules' assessments only. A student's result for a module is the average of the percentages they scored across its assessments, measured against the lecturer's pass mark.
+- **Dashboard** — their students, their modules (each at its level), whether today's register is in, attendance per module and level, and who has fallen below their attendance bar.
+- **Students** — read-only roll of every student whose course and level match something they teach.
+- **Attendance** — select a module at its level (shown as e.g. "Electrical Installation Level I"), the attending course(s) and a date; mark each active student at that level Present/Absent; save (upserts, so re-saving edits rather than duplicates); then edit, move or delete an already-saved session from its history. A register records the level it was taken at, so a student who has since moved up still appears on the sheets that recorded them.
+- **Assessments & Marks** — create an assessment against one of their modules at a level and one or more of the courses they teach it to, each marked out of its own total (100 by default), then enter or revisit marks per student. The list holds the assessments for the modules and levels they teach only. A student's result for a module is the average of the percentages they scored across its assessments, measured against the lecturer's pass mark.
 - **Reports** — attendance registers with a signature column, assessment sheets that print each mark as a percentage and a PASS/FAIL against the pass mark, and a per-student report over any range of dates or set of assessments.
 - **Settings** — their own minimum attendance threshold and assessment pass mark, which their reports are measured against.
 
@@ -189,5 +190,7 @@ rule.
 
 - JSON API responses use a consistent envelope: `{ success: true, data }` or `{ success: false, message }`. PDF-download endpoints return `application/pdf`, and the view-as endpoint redirects into the selected workspace.
 - Client and server both validate input with the same Zod schemas.
+- Every module picker outside the Modules page is filled from `/api/teaching-units`: each module at each level the account can use, with its courses. Access to a module at a level is checked in one place, `resolveClass` in `src/lib/services/teaching.service.ts`; a lecturer's scope comes only from their `TeachingAssignment` rows (`src/lib/scope.ts`).
+- Every list of courses, modules or assessments to choose from has a search box (`SearchableSelect`, and `CheckboxGroup` past six options).
 - `pdfkit` is registered under `serverExternalPackages` in `next.config.ts` — required so its bundled font files resolve correctly at runtime; do not remove this without re-testing report generation.
 - Reports are set in Trebuchet MS at 10–12pt with every table cell centred and padded, the logo centred above the institution name (`src/lib/pdf.ts`). The font is read from `assets/fonts/trebuc.ttf` and `trebucbd.ttf`, which must be copied from a licensed Windows machine (see `assets/fonts/README.md`); without them reports fall back to Helvetica. `outputFileTracingIncludes` in `next.config.ts` ships that folder with the server build.

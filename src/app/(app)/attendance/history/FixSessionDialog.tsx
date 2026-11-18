@@ -6,7 +6,8 @@ import dayjs from "dayjs";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiClientError } from "@/lib/api-client";
-import type { Module } from "@/types";
+import type { TeachingUnit } from "@/types";
+import { classKey } from "@/lib/levels";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -15,7 +16,9 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export type SessionRef = {
   moduleId: string;
-  moduleName: string;
+  level: number;
+  /** "Electrical Installation Level I" */
+  label: string;
   date: string;
   courseIds: string[];
   total: number;
@@ -31,32 +34,32 @@ export function FixSessionDialog({
   open,
   onClose,
   session,
-  modules,
+  units,
 }: {
   open: boolean;
   onClose: () => void;
   session: SessionRef | null;
-  modules: Module[];
+  units: TeachingUnit[];
 }) {
   const queryClient = useQueryClient();
-  const [targetModuleId, setTargetModuleId] = useState("");
+  const [targetKey, setTargetKey] = useState("");
   const [targetDate, setTargetDate] = useState("");
   const [targetCourseIds, setTargetCourseIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (open && session) {
-      setTargetModuleId(session.moduleId);
+      setTargetKey(classKey(session.moduleId, session.level));
       setTargetDate(dayjs(session.date).format("YYYY-MM-DD"));
       setTargetCourseIds(session.courseIds);
     }
   }, [open, session]);
 
-  const targetModule = modules.find((m) => m.id === targetModuleId);
+  const targetUnit = units.find((u) => u.key === targetKey);
 
-  // Switching module invalidates any course selection from the previous one.
-  function handleModuleChange(id: string) {
-    setTargetModuleId(id);
-    const next = modules.find((m) => m.id === id);
+  // Switching module or level invalidates any course selection from the previous one.
+  function handleModuleChange(key: string) {
+    setTargetKey(key);
+    const next = units.find((u) => u.key === key);
     setTargetCourseIds(next ? next.courses.map((c) => c.id) : []);
   }
 
@@ -64,9 +67,11 @@ export function FixSessionDialog({
     mutationFn: () =>
       api.patch<{ moved: number; removed: number }>("/api/attendance/session", {
         moduleId: session!.moduleId,
+        level: session!.level,
         date: session!.date,
         courseIds: session!.courseIds,
-        targetModuleId,
+        targetModuleId: targetUnit!.moduleId,
+        targetLevel: targetUnit!.level,
         targetDate,
         targetCourseIds,
       }),
@@ -87,7 +92,7 @@ export function FixSessionDialog({
   if (!session) return null;
 
   const unchanged =
-    targetModuleId === session.moduleId &&
+    targetKey === classKey(session.moduleId, session.level) &&
     targetDate === dayjs(session.date).format("YYYY-MM-DD") &&
     targetCourseIds.length === session.courseIds.length &&
     targetCourseIds.every((id) => session.courseIds.includes(id));
@@ -100,7 +105,7 @@ export function FixSessionDialog({
         <div className="rounded-md bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">
           <p className="text-slate-500 dark:text-slate-400">Currently saved as</p>
           <p className="font-medium text-slate-900 dark:text-slate-100">
-            {session.moduleName} · {dayjs(session.date).format("DD MMM YYYY")} · {session.total} records
+            {session.label} · {dayjs(session.date).format("DD MMM YYYY")} · {session.total} records
           </p>
         </div>
 
@@ -109,9 +114,9 @@ export function FixSessionDialog({
             <Label htmlFor="fix-module">Module it should be under</Label>
             <SearchableSelect
               id="fix-module"
-              value={targetModuleId}
+              value={targetKey}
               onChange={handleModuleChange}
-              options={modules.map((m) => ({ value: m.id, label: m.name, hint: m.code ?? undefined }))}
+              options={units.map((u) => ({ value: u.key, label: u.label, hint: u.code ?? undefined }))}
             />
           </div>
           <div>
@@ -129,7 +134,7 @@ export function FixSessionDialog({
         <div>
           <Label htmlFor="fix-courses">Courses that actually attended</Label>
           <CheckboxGroup
-            options={(targetModule?.courses ?? []).map((c) => ({
+            options={(targetUnit?.courses ?? []).map((c) => ({
               id: c.id,
               label: c.name,
             }))}
@@ -152,7 +157,7 @@ export function FixSessionDialog({
         )}
 
         <p className="text-xs text-slate-400">
-          If a record already exists on the destination module and date for the same student, it is
+          If a record already exists on the destination module, level and date for the same student, it is
           replaced by the one being moved.
         </p>
 
@@ -162,7 +167,7 @@ export function FixSessionDialog({
           </Button>
           <Button
             type="button"
-            disabled={unchanged || targetCourseIds.length === 0}
+            disabled={unchanged || !targetUnit || targetCourseIds.length === 0}
             loading={moveMutation.isPending}
             onClick={() => moveMutation.mutate()}
           >

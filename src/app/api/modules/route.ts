@@ -1,10 +1,11 @@
 import { ok, handleApiError } from "@/lib/api-response";
 import { requireSession, requireAdmin, assertNotImpersonating } from "@/lib/auth";
 import { parsePagination } from "@/lib/pagination";
-import { moduleSchema } from "@/lib/validators/module";
+import { moduleSchema, parseLevelParam } from "@/lib/validators/module";
 import { listModules, listAllModules, createModule } from "@/lib/services/module.service";
 import { getScopedModuleIds } from "@/lib/scope";
 import { recordAudit } from "@/lib/audit";
+import { levelLabel } from "@/lib/levels";
 
 export async function GET(request: Request) {
   try {
@@ -17,8 +18,11 @@ export async function GET(request: Request) {
     }
 
     const search = searchParams.get("search")?.trim() ?? "";
+    const kindParam = searchParams.get("kind");
+    const kind = kindParam === "CORE" || kindParam === "RELATED" ? kindParam : undefined;
+    const level = parseLevelParam(searchParams.get("level"));
     const { page, pageSize } = parsePagination(searchParams);
-    return ok(await listModules(search, page, pageSize, scopeIds));
+    return ok(await listModules({ search, kind, level, page, pageSize }, scopeIds));
   } catch (error) {
     return handleApiError(error);
   }
@@ -35,13 +39,8 @@ export async function POST(request: Request) {
       action: "module.create",
       entity: "Module",
       entityId: module_.id,
-      summary: `${session.name} created the module ${module_.name} (${module_.level}, ${module_.semester})`,
-      metadata: {
-        courses: module_.courses.map((c) => c.name),
-        level: module_.level,
-        semester: module_.semester,
-        academicYear: module_.academicYear,
-      },
+      summary: `${session.name} created the related module ${module_.name} (${levelLabel(data.level)})`,
+      metadata: { kind: module_.kind, level: module_.level, code: module_.code },
     });
 
     return ok(module_, 201);
