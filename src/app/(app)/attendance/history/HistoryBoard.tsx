@@ -8,7 +8,6 @@ import { ArrowLeft, Pencil, Wrench, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiClientError } from "@/lib/api-client";
 import type { AttendanceHistoryEntry, Module } from "@/types";
-import { Select } from "@/components/ui/Select";
 import { Input, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
@@ -16,6 +15,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { FixSessionDialog, type SessionRef } from "./FixSessionDialog";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export function HistoryBoard() {
   const queryClient = useQueryClient();
@@ -95,32 +95,27 @@ export function HistoryBoard() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="sm:w-64">
           <Label htmlFor="module">Module</Label>
-          <Select
+          <SearchableSelect
             id="module"
             value={moduleId}
-            onChange={(e) => {
-              setModuleId(e.target.value);
+            onChange={(value) => {
+              setModuleId(value);
               setCourseId("");
             }}
-          >
-            <option value="">Select a module...</option>
-            {modules?.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </Select>
+            placeholder="Select a module..."
+            options={(modules ?? []).map((m) => ({ value: m.id, label: m.name, hint: m.code ?? undefined }))}
+          />
         </div>
         <div className="sm:w-56">
           <Label htmlFor="course">Course</Label>
-          <Select id="course" value={courseId} onChange={(e) => setCourseId(e.target.value)} disabled={!moduleId}>
-            <option value="">All courses</option>
-            {selectedModule?.courses.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
+          <SearchableSelect
+            id="course"
+            value={courseId}
+            onChange={setCourseId}
+            disabled={!moduleId}
+            emptyOption="All courses"
+            options={(selectedModule?.courses ?? []).map((c) => ({ value: c.id, label: c.name }))}
+          />
         </div>
         <div className="sm:w-44">
           <Label htmlFor="from">From</Label>

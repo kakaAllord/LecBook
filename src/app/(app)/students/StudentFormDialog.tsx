@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { Input, Label, FieldError } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export function StudentFormDialog({
   open,
@@ -35,6 +36,7 @@ export function StudentFormDialog({
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
@@ -125,14 +127,20 @@ export function StudentFormDialog({
 
         <div>
           <Label htmlFor="courseId">Course</Label>
-          <Select id="courseId" error={errors.courseId?.message} {...register("courseId")}>
-            <option value="">Select a course...</option>
-            {courses?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
+          <Controller
+            control={control}
+            name="courseId"
+            render={({ field }) => (
+              <SearchableSelect
+                id="courseId"
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                error={errors.courseId?.message}
+                placeholder="Select a course..."
+                options={(courses ?? []).map((c) => ({ value: c.id, label: c.name }))}
+              />
+            )}
+          />
           <FieldError message={errors.courseId?.message} />
         </div>
 

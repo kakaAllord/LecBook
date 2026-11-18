@@ -65,7 +65,7 @@ export function bufferPdf(
 }
 
 /** Sets the report typeface at a size inside the 10–12pt band. */
-export function useFont(doc: PDFKit.PDFDocument, opts: { bold?: boolean; size?: number } = {}) {
+export function setFont(doc: PDFKit.PDFDocument, opts: { bold?: boolean; size?: number } = {}) {
   return doc.font(opts.bold ? REPORT_FONT.bold : REPORT_FONT.regular).fontSize(opts.size ?? REPORT_SIZE.body);
 }
 
@@ -102,15 +102,15 @@ export function addReportHeader(
     doc.y += LOGO_SIZE + 6;
   }
 
-  useFont(doc, { bold: true, size: REPORT_SIZE.title }).text(institutionName, left, doc.y, {
+  setFont(doc, { bold: true, size: REPORT_SIZE.title }).text(institutionName, left, doc.y, {
     width,
     align: "center",
   });
   doc.moveDown(0.15);
-  useFont(doc, { bold: true, size: REPORT_SIZE.heading }).text(title, left, doc.y, { width, align: "center" });
+  setFont(doc, { bold: true, size: REPORT_SIZE.heading }).text(title, left, doc.y, { width, align: "center" });
   if (subtitle) {
     doc.moveDown(0.15);
-    useFont(doc).fillColor("#555555").text(subtitle, left, doc.y, { width, align: "center" });
+    setFont(doc).fillColor("#555555").text(subtitle, left, doc.y, { width, align: "center" });
     doc.fillColor("#000000");
   }
   doc.moveDown(0.4);
@@ -127,9 +127,9 @@ export function addReportHeader(
 /** A section heading inside a report, left to the margin like a document's. */
 export function addSectionTitle(doc: PDFKit.PDFDocument, title: string) {
   doc.moveDown(0.4);
-  useFont(doc, { bold: true, size: REPORT_SIZE.heading }).fillColor("#111827").text(title, doc.page.margins.left);
+  setFont(doc, { bold: true, size: REPORT_SIZE.heading }).fillColor("#111827").text(title, doc.page.margins.left);
   doc.moveDown(0.3);
-  useFont(doc).fillColor("#000000");
+  setFont(doc).fillColor("#000000");
 }
 
 /** A line of body text at the margin, for notes, summaries and empty states. */
@@ -140,7 +140,7 @@ export function addParagraph(
 ) {
   const left = doc.page.margins.left;
   const width = doc.page.width - left - doc.page.margins.right;
-  useFont(doc, { bold: opts.bold })
+  setFont(doc, { bold: opts.bold })
     .fillColor(opts.color ?? "#000000")
     .text(text, left, doc.y, { width, align: opts.align ?? "left" });
   doc.fillColor("#000000");
@@ -173,7 +173,7 @@ export function drawCellText(
   height: number,
   opts: { bold?: boolean; color?: string; wrap?: boolean } = {}
 ) {
-  useFont(doc, { bold: opts.bold });
+  setFont(doc, { bold: opts.bold });
   const inner = Math.max(1, width - CELL_PADDING * 2);
   doc.fillColor(opts.color ?? "#000000");
   if (opts.wrap) {
@@ -195,7 +195,7 @@ export function drawCellText(
  * shorter than a single-line row.
  */
 function wrappedRowHeight(doc: PDFKit.PDFDocument, cells: TableCell[], bold?: boolean) {
-  useFont(doc, { bold });
+  setFont(doc, { bold });
   const tallest = Math.max(
     ...cells.map((c) => (c.text ? doc.heightOfString(c.text, { width: Math.max(1, c.width - CELL_PADDING * 2) }) : 0))
   );

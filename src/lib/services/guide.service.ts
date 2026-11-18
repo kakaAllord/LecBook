@@ -216,6 +216,7 @@ const SECTIONS: Section[] = [
     steps: [
       "Toggle dark mode any time with the sun/moon icon at the bottom of the sidebar — your choice is remembered.",
       "Lists provide search, filters and pagination where they are useful for the records on that page.",
+      "Every place you pick a course, module or assessment from a list has a search box: type a few letters of the name or code to narrow it. Where several can be ticked, \"Select all\" ticks everything the search is showing.",
       "Deleting anything always asks for confirmation first, so accidental clicks are safe.",
       "Typing a number and then scrolling the page will not change the number — marks stay exactly as you entered them.",
     ],

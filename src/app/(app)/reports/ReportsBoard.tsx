@@ -8,10 +8,10 @@ import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import type { Assessment, Module, UserRole } from "@/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
-import { Select } from "@/components/ui/Select";
 import { Input, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { StudentReportCard } from "./StudentReportCard";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export function ReportsBoard({ role }: { role: UserRole }) {
   const { data: modules } = useQuery({
@@ -59,32 +59,27 @@ function ModuleCourseSelects({
     <>
       <div>
         <Label htmlFor={`${idPrefix}-module`}>Module</Label>
-        <Select
+        <SearchableSelect
           id={`${idPrefix}-module`}
           value={moduleId}
-          onChange={(e) => {
-            setModuleId(e.target.value);
+          onChange={(value) => {
+            setModuleId(value);
             setCourseId("");
           }}
-        >
-          <option value="">Select a module...</option>
-          {modules.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </Select>
+          placeholder="Select a module..."
+          options={modules.map((m) => ({ value: m.id, label: m.name, hint: m.code ?? undefined }))}
+        />
       </div>
       <div>
         <Label htmlFor={`${idPrefix}-course`}>Course</Label>
-        <Select id={`${idPrefix}-course`} value={courseId} onChange={(e) => setCourseId(e.target.value)} disabled={!moduleId}>
-          <option value="">All courses in module</option>
-          {selectedModule?.courses.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </Select>
+        <SearchableSelect
+          id={`${idPrefix}-course`}
+          value={courseId}
+          onChange={setCourseId}
+          disabled={!moduleId}
+          emptyOption="All courses in module"
+          options={(selectedModule?.courses ?? []).map((c) => ({ value: c.id, label: c.name }))}
+        />
       </div>
     </>
   );
@@ -218,15 +213,21 @@ function AssessmentReportCard({ modules }: { modules: Module[] }) {
         />
         <div>
           <Label htmlFor="ass-assessment">Assessment</Label>
-          <Select id="ass-assessment" value={assessmentId} onChange={(e) => setAssessmentId(e.target.value)} disabled={!moduleId}>
-            <option value="">Select an assessment...</option>
-            <option value="__all__">All Assessments{moduleId ? "" : " (select a module first)"}</option>
-            {assessments?.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name} · {a.courses.map((c) => c.name).join(", ")}
-              </option>
-            ))}
-          </Select>
+          <SearchableSelect
+            id="ass-assessment"
+            value={assessmentId}
+            onChange={setAssessmentId}
+            disabled={!moduleId}
+            placeholder="Select an assessment..."
+            options={[
+              { value: "__all__", label: "All Assessments" },
+              ...(assessments ?? []).map((a) => ({
+                value: a.id,
+                label: a.name,
+                hint: a.courses.map((c) => c.name).join(", "),
+              })),
+            ]}
+          />
         </div>
         <a href={href ?? "#"} target="_blank" rel="noreferrer" onClick={handleClick}>
           <Button type="button" className="w-full">

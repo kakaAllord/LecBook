@@ -9,7 +9,6 @@ import { History, Save, ClipboardCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, ApiClientError } from "@/lib/api-client";
 import type { AttendanceForDate, AttendanceStatus, Module } from "@/types";
-import { Select } from "@/components/ui/Select";
 import { Input, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { CheckboxGroup } from "@/components/ui/CheckboxGroup";
@@ -17,6 +16,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
 import { AttendanceStatusToggle } from "@/components/attendance/AttendanceStatusPicker";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 type DraftRecord = { status: AttendanceStatus; remarks: string };
 
@@ -108,21 +108,16 @@ export function AttendanceBoard() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="sm:w-64">
           <Label htmlFor="module">Module</Label>
-          <Select
+          <SearchableSelect
             id="module"
             value={moduleId}
-            onChange={(e) => {
-              setModuleId(e.target.value);
+            onChange={(value) => {
+              setModuleId(value);
               setCourseIds([]);
             }}
-          >
-            <option value="">Select a module...</option>
-            {modules?.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </Select>
+            placeholder="Select a module..."
+            options={(modules ?? []).map((m) => ({ value: m.id, label: m.name, hint: m.code ?? undefined }))}
+          />
         </div>
         <div className="sm:w-72">
           <Label htmlFor="courses">Course(s) present this session</Label>

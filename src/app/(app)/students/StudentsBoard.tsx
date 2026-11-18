@@ -17,6 +17,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Badge, studentStatusColor } from "@/components/ui/Badge";
 import { StudentFormDialog } from "./StudentFormDialog";
 import { StudentExportDialog } from "./StudentExportDialog";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export function StudentsBoard({ canManage }: { canManage: boolean }) {
   const queryClient = useQueryClient();
@@ -87,21 +88,16 @@ export function StudentsBoard({ canManage }: { canManage: boolean }) {
           placeholder="Search by name, reg. no, or phone..."
           className="sm:max-w-xs"
         />
-        <Select
+        <SearchableSelect
           value={courseId}
-          onChange={(e) => {
-            setCourseId(e.target.value);
+          onChange={(value) => {
+            setCourseId(value);
             setPage(1);
           }}
-          className="sm:max-w-xs"
-        >
-          <option value="">All courses</option>
-          {courses?.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </Select>
+          className="w-full sm:max-w-xs"
+          emptyOption="All courses"
+          options={(courses ?? []).map((c) => ({ value: c.id, label: c.name }))}
+        />
         <Select
           value={status}
           onChange={(e) => {

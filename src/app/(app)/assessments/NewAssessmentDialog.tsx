@@ -17,9 +17,9 @@ import { api, ApiClientError } from "@/lib/api-client";
 import type { Assessment, Module } from "@/types";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input, Label, FieldError } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
 import { CheckboxGroup } from "@/components/ui/CheckboxGroup";
 import { Button } from "@/components/ui/Button";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export function NewAssessmentDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const queryClient = useQueryClient();
@@ -81,14 +81,20 @@ export function NewAssessmentDialog({ open, onClose }: { open: boolean; onClose:
       <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
         <div>
           <Label htmlFor="moduleId">Module</Label>
-          <Select id="moduleId" error={errors.moduleId?.message} {...register("moduleId")}>
-            <option value="">Select a module...</option>
-            {modules?.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </Select>
+          <Controller
+            control={control}
+            name="moduleId"
+            render={({ field }) => (
+              <SearchableSelect
+                id="moduleId"
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                error={errors.moduleId?.message}
+                placeholder="Select a module..."
+                options={(modules ?? []).map((m) => ({ value: m.id, label: m.name, hint: m.code ?? undefined }))}
+              />
+            )}
+          />
           <FieldError message={errors.moduleId?.message} />
         </div>
 

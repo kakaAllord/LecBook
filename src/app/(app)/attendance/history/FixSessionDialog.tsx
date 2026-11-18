@@ -8,10 +8,10 @@ import { toast } from "sonner";
 import { api, ApiClientError } from "@/lib/api-client";
 import type { Module } from "@/types";
 import { Dialog } from "@/components/ui/Dialog";
-import { Select } from "@/components/ui/Select";
 import { Input, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { CheckboxGroup } from "@/components/ui/CheckboxGroup";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export type SessionRef = {
   moduleId: string;
@@ -107,18 +107,12 @@ export function FixSessionDialog({
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor="fix-module">Module it should be under</Label>
-            <Select
+            <SearchableSelect
               id="fix-module"
               value={targetModuleId}
-              onChange={(e) => handleModuleChange(e.target.value)}
-            >
-              {modules.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                  {m.code ? ` (${m.code})` : ""}
-                </option>
-              ))}
-            </Select>
+              onChange={handleModuleChange}
+              options={modules.map((m) => ({ value: m.id, label: m.name, hint: m.code ?? undefined }))}
+            />
           </div>
           <div>
             <Label htmlFor="fix-date">Date it should be on</Label>

@@ -9,12 +9,12 @@ import { toast } from "sonner";
 import { api, ApiClientError } from "@/lib/api-client";
 import type { Assessment, Module } from "@/types";
 import { Button } from "@/components/ui/Button";
-import { Select } from "@/components/ui/Select";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { NewAssessmentDialog } from "./NewAssessmentDialog";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export function AssessmentsBoard() {
   const queryClient = useQueryClient();
@@ -67,29 +67,24 @@ export function AssessmentsBoard() {
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <Select
+        <SearchableSelect
           value={moduleId}
-          onChange={(e) => {
-            setModuleId(e.target.value);
+          onChange={(value) => {
+            setModuleId(value);
             setCourseId("");
           }}
-          className="max-w-xs"
-        >
-          <option value="">All modules</option>
-          {modules?.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </Select>
-        <Select value={courseId} onChange={(e) => setCourseId(e.target.value)} className="max-w-xs" disabled={!moduleId}>
-          <option value="">All courses</option>
-          {selectedModule?.courses.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </Select>
+          className="w-full sm:max-w-xs"
+          emptyOption="All modules"
+          options={(modules ?? []).map((m) => ({ value: m.id, label: m.name, hint: m.code ?? undefined }))}
+        />
+        <SearchableSelect
+          value={courseId}
+          onChange={setCourseId}
+          className="w-full sm:max-w-xs"
+          disabled={!moduleId}
+          emptyOption="All courses"
+          options={(selectedModule?.courses ?? []).map((c) => ({ value: c.id, label: c.name }))}
+        />
       </div>
 
       {isLoading ? (
