@@ -185,12 +185,13 @@ const SECTIONS: Section[] = [
   // ------------------------------------------------------------------ shared
   {
     title: "6. Reports",
-    intro: "Printable PDFs, generated on demand.",
+    intro: "Printable PDFs, and a student list you can also take as a spreadsheet, generated on demand.",
     roles: ["ADMIN", "LECTURER"],
     steps: [
       'Attendance Report: choose a module at its level, optionally one course and a date range, then "Download PDF" — a tick-sheet register, one row per student and one column per date, with totals, percentages and a signature column.',
       'Assessment Report: choose a module at its level and either one assessment or all of them, then "Download PDF". A single-assessment sheet gives each student their mark, that mark as a percentage of what the assessment was marked out of, and PASS or FAIL against your pass mark, under a header carrying the average, highest and lowest. The all-assessments summary averages each student\'s percentages across the module and judges that average the same way. Both include a signature column.',
       "Student Report: search for one student, then ask for either their attendance (any modules, at any level, any date range) or their marks (any modules, at any level, any assessments). Leaving a selection empty means all of it — for a lecturer, all of their own modules. Marks come back per module, each with its average and a PASS or FAIL, and one overall average across everything selected.",
+      'Student List: pull out a list of students with their registration number, gender, phone, course, level and status. Choose a Status (All, Active, Inactive or Completed), and optionally a Module, a Level and a Course; the filters combine, so "Active, Level II, Plumbing" is one list. Choosing a module gives the students it is taught to and fixes the level to the module\'s. "Download PDF" prints it as a numbered list with totals by status and gender; "Download CSV" opens in Excel or any spreadsheet. A lecturer\'s list only ever holds students on the courses and levels they teach.',
       "Every academic report opens with the logo set by the administrator, centred at the top, with the Institution Name directly beneath it. Later pages carry a one-line heading with the institution, the report and what it covers, and every page is numbered and dated at the foot.",
       "Reports are set in Trebuchet MS at 10 to 12 point, with every table cell centred and padded so the printout reads as a tidy document. Long names, registration numbers and remarks are printed in full, wrapping onto a second line rather than being cut short. When a register has more dates, or a summary more assessments, than fit across one page, they continue on further pages, each labelled with the ones it holds (e.g. Sessions 9–16 of 22).",
     ],

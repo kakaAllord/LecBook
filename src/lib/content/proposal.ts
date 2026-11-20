@@ -99,6 +99,7 @@ export const PROPOSAL: Proposal = {
             "Accounts can be deactivated the moment someone leaves, preventing that account from signing in again unless it is reactivated.",
             "Printable attendance reports for any module at a level, optional course and date range, plus assessment reports for one assessment or all assessments in a module at a level — set in Trebuchet MS with the college logo centred above its name.",
             "A complete record of any individual student — attendance per module, marks per assessment — filtered to whatever range is needed and exported as a PDF or copied as text.",
+            "A student list on demand — everyone, or narrowed by status, level, course or module — printed as a PDF or downloaded as a spreadsheet.",
           ],
         },
         { type: "subheading", text: "Who can do what" },

@@ -11,6 +11,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { StudentReportCard } from "./StudentReportCard";
+import { StudentListCard } from "./StudentListCard";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 export function ReportsBoard({ role }: { role: UserRole }) {
@@ -35,6 +36,7 @@ export function ReportsBoard({ role }: { role: UserRole }) {
         <AttendanceReportCard units={units ?? []} />
         <AssessmentReportCard units={units ?? []} />
         <StudentReportCard units={units ?? []} />
+        <StudentListCard units={units ?? []} />
       </div>
     </div>
   );
