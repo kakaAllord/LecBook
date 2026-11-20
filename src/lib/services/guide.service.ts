@@ -94,8 +94,8 @@ const SECTIONS: Section[] = [
     intro: "Set up what is taught before registering anyone against it.",
     roles: ["ADMIN"],
     steps: [
-      'Open Courses and click "New Course": the name, and nothing else — no level (e.g. Electrical Installation). A course is added only once; its students move up through Level I, II and III on it.',
-      "Adding a course also adds its core module, with the same name. The core module is taught to that course at every level, from Level I to Level III. Renaming the course renames it; its code can be set from the Modules page.",
+      'Open Courses and click "New Course": the name, and optionally its core module code — no level (e.g. Electrical Installation, EI100). A course is added only once; its students move up through Level I, II and III on it.',
+      "Adding a course also adds its core module, with the same name. The core module is taught to that course at every level, from Level I to Level III. Renaming the course renames it. Its code is set on the course form, or later from the course's pencil icon or the Modules page.",
       'Open Modules and click "New Related Module" for the subjects every course shares at a level: a name, an optional code, and the Level (e.g. Communication Skills, CS101, Level I). A related module is the same for all courses at that level.',
       "Filter the Modules list by kind (core or related) and by level. A module with registers or assessments recorded against it cannot be deleted, and a related module's level cannot change once it has them.",
       "Use the search bar to find a record, or the pencil and trash icons on a row to edit or delete it.",

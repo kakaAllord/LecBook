@@ -59,6 +59,8 @@ export function ModuleFormDialog({
       toast.success(isEdit ? "Module updated" : "Module created");
       queryClient.invalidateQueries({ queryKey: ["modules"] });
       queryClient.invalidateQueries({ queryKey: ["teaching-units"] });
+      // The Courses list shows each core module's code.
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
       onClose();
     },
     onError: (error) => {
