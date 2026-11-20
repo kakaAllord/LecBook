@@ -51,24 +51,47 @@ export async function getCourse(id: string) {
 
 /**
  * A course arrives with its core module: the one module every student on it
- * takes from Level I to Level III, carrying the course's own name.
+ * takes from Level I to Level III, carrying the course's own name and, if one
+ * was given, its code.
  */
 export async function createCourse(data: CourseInput) {
   return prisma.course.create({
-    data: { name: data.name, coreModule: { create: { name: data.name, kind: "CORE" } } },
+    data: {
+      name: data.name,
+      coreModule: { create: { name: data.name, code: data.coreModuleCode || null, kind: "CORE" } },
+    },
     include: { coreModule: true },
   });
 }
 
-/** Renaming a course renames its core module with it, so the two never drift apart. */
+/**
+ * Renaming a course renames its core module with it, so the two never drift
+ * apart. The core module's code can be changed here too; it is the same
+ * column the Modules page edits.
+ */
 export async function updateCourse(id: string, data: CourseUpdateInput) {
-  await getCourse(id);
+  const existing = await getCourse(id);
+  const { name, coreModuleCode } = data;
+
+  const moduleChanges = {
+    ...(name !== undefined ? { name } : {}),
+    ...(coreModuleCode !== undefined ? { code: coreModuleCode || null } : {}),
+  };
+
   return prisma.course.update({
     where: { id },
     data: {
-      ...data,
-      ...(data.name !== undefined
-        ? { coreModule: { upsert: { create: { name: data.name, kind: "CORE" }, update: { name: data.name } } } }
+      ...(name !== undefined ? { name } : {}),
+      ...(Object.keys(moduleChanges).length > 0
+        ? {
+            coreModule: {
+              // A course made before core modules existed may not have one yet.
+              upsert: {
+                create: { name: name ?? existing.name, kind: "CORE", ...moduleChanges },
+                update: moduleChanges,
+              },
+            },
+          }
         : {}),
     },
     include: { coreModule: true },

@@ -15,13 +15,20 @@ export function parseLevelParam(value: string | null): number | undefined {
 }
 
 /**
+ * A module's code, optional. Shared with the course form, which sets the code
+ * of the core module it creates, so the two places accept the same thing.
+ * An empty string clears it.
+ */
+export const moduleCodeSchema = z.string().trim().max(50, "Code is at most 50 characters").optional();
+
+/**
  * Only related modules are created by hand: a core module comes into being
  * with its course and carries the course's name. A related module belongs to
  * one level and is taught to every course at that level.
  */
 export const moduleSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
-  code: z.string().max(50).optional(),
+  code: moduleCodeSchema,
   level: levelSchema,
 });
 

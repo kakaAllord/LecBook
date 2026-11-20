@@ -36,6 +36,7 @@ export async function POST(request: Request) {
       entity: "Course",
       entityId: course.id,
       summary: `${session.name} created the course ${course.name}`,
+      metadata: { coreModuleCode: course.coreModule?.code ?? null },
     });
 
     return ok(course, 201);

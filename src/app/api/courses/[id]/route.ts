@@ -31,6 +31,7 @@ export async function PATCH(request: Request, { params }: Params) {
       entity: "Course",
       entityId: id,
       summary: `${session.name} updated the course ${course.name}`,
+      metadata: { coreModuleCode: course.coreModule?.code ?? null },
     });
 
     return ok(course);
