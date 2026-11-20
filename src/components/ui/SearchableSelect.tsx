@@ -185,9 +185,12 @@ export function SearchableSelect({
                       option.value === value ? "opacity-100" : "opacity-0"
                     )}
                   />
+                  {/* Options wrap rather than truncate: on a phone, two modules
+                      that differ only after the cut-off look identical. The
+                      closed field can truncate; the list is where you choose. */}
                   <span className="min-w-0">
-                    <span className="block truncate">{option.label}</span>
-                    {option.hint && <span className="block truncate text-xs text-slate-400">{option.hint}</span>}
+                    <span className="block break-words">{option.label}</span>
+                    {option.hint && <span className="block break-words text-xs text-slate-400">{option.hint}</span>}
                   </span>
                 </li>
               ))
