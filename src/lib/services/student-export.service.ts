@@ -6,12 +6,10 @@ import {
   addReportHeader,
   addSectionTitle,
   addParagraph,
-  addGeneratedFooter,
   drawTableRow,
-  needsPageBreak,
   HEADER_SHADE,
 } from "@/lib/pdf";
-import { computeStanding, passes, roundPercentage } from "@/lib/grading";
+import { computeStanding, passes, roundPercentage, scorePercentage } from "@/lib/grading";
 import { getSettingsFor } from "@/lib/services/settings.service";
 import type { Session } from "@/lib/auth";
 import { toUtcDayStart, toUtcDayEnd } from "@/lib/date";
@@ -363,181 +361,240 @@ export function renderStudentExportText(data: StudentExportData, options: Studen
 const PROFILE = { label: 175, value: 340 };
 const ATTENDANCE = { module: 175, present: 65, absent: 65, sessions: 70, rate: 70, status: 70 };
 const RECORD = { date: 175, status: 130, remarks: 210 };
-const ASSESSMENT = { name: 155, date: 110, marks: 110, remarks: 140 };
+const ASSESSMENT = { name: 150, date: 85, marks: 75, score: 55, remarks: 150 };
 const ASSESSMENT_MODULE = { module: 215, marked: 130, result: 170 };
 
+/** "ACTIVE" → "Active", for a document rather than a database. */
+function statusLabel(status: string) {
+  return status.charAt(0) + status.slice(1).toLowerCase();
+}
+
 export async function renderStudentExportPdf(data: StudentExportData, options: StudentExportInput) {
-  const pdf = await bufferPdf((doc) => {
-    const header = () =>
-      addReportHeader(
-        doc,
-        data.institutionName,
-        "Student Record",
-        `${data.student.fullName} · ${data.student.registrationNumber}`,
-        data.institutionLogo
-      );
-    const breakIfNeeded = () => {
-      if (needsPageBreak(doc)) {
+  const pdf = await bufferPdf(
+    (doc) => {
+      let pages = 0;
+      const header = () =>
+        addReportHeader(
+          doc,
+          data.institutionName,
+          "Student Record",
+          `${data.student.fullName} · ${data.student.registrationNumber}`,
+          data.institutionLogo,
+          { continued: pages++ > 0 }
+        );
+      const newPage = () => {
         doc.addPage();
         header();
+      };
+
+      header();
+
+      if (options.includeProfile) {
+        addSectionTitle(doc, "Student Details", newPage);
+        const rows: [string, string][] = [
+          ["Full Name", data.student.fullName],
+          ["Registration Number", data.student.registrationNumber],
+          ["Gender", data.student.gender],
+          ["Phone", data.student.phone || "-"],
+          ["Course", data.student.course],
+          ["Level", data.student.level],
+          ["Status", statusLabel(data.student.status)],
+          ["Registered On", data.student.registeredOn],
+        ];
+        for (const [label, value] of rows) {
+          drawTableRow(
+            doc,
+            [
+              { text: label, width: PROFILE.label },
+              { text: value, width: PROFILE.value },
+            ],
+            { newPage: header }
+          );
+        }
+        doc.moveDown(0.8);
       }
-    };
 
-    header();
+      if (data.attendance) {
+        addSectionTitle(doc, `Attendance — ${data.filters.attendanceRange}`, newPage);
+        const summaryHeader = () =>
+          drawTableRow(
+            doc,
+            [
+              { text: "Module", width: ATTENDANCE.module },
+              { text: "Present", width: ATTENDANCE.present },
+              { text: "Absent", width: ATTENDANCE.absent },
+              { text: "Sessions", width: ATTENDANCE.sessions },
+              { text: "Attendance", width: ATTENDANCE.rate },
+              { text: "Status", width: ATTENDANCE.status },
+            ],
+            { bold: true, shade: HEADER_SHADE, newPage: header }
+          );
+        const recordHeader = () =>
+          drawTableRow(
+            doc,
+            [
+              { text: "Date", width: RECORD.date },
+              { text: "Status", width: RECORD.status },
+              { text: "Remarks", width: RECORD.remarks },
+            ],
+            { bold: true, newPage: header }
+          );
+        summaryHeader();
 
-    if (options.includeProfile) {
-      addSectionTitle(doc, "Student Details");
-      const rows: [string, string][] = [
-        ["Full Name", data.student.fullName],
-        ["Registration Number", data.student.registrationNumber],
-        ["Gender", data.student.gender],
-        ["Phone", data.student.phone || "-"],
-        ["Course", data.student.course],
-        ["Level", data.student.level],
-        ["Status", data.student.status],
-        ["Registered On", data.student.registeredOn],
-      ];
-      for (const [label, value] of rows) {
-        breakIfNeeded();
-        drawTableRow(doc, [
-          { text: label, width: PROFILE.label },
-          { text: value, width: PROFILE.value },
-        ]);
-      }
-      doc.moveDown(0.8);
-    }
+        for (const [index, m] of data.attendance.modules.entries()) {
+          // With the dates listed, each module's summary row heads its own
+          // block, so it repeats the column names it needs.
+          if (index > 0 && m.records) summaryHeader();
+          drawTableRow(
+            doc,
+            [
+              { text: m.module, width: ATTENDANCE.module },
+              { text: String(m.present), width: ATTENDANCE.present },
+              { text: String(m.absent), width: ATTENDANCE.absent },
+              { text: String(m.total), width: ATTENDANCE.sessions },
+              { text: `${m.percentage}%`, width: ATTENDANCE.rate },
+              { text: m.meetsThreshold ? "OK" : "LOW", width: ATTENDANCE.status, status: { positive: m.meetsThreshold } },
+            ],
+            { newPage: header }
+          );
 
-    if (data.attendance) {
-      addSectionTitle(doc, `Attendance — ${data.filters.attendanceRange}`);
-      drawTableRow(
-        doc,
-        [
-          { text: "Module", width: ATTENDANCE.module },
-          { text: "Present", width: ATTENDANCE.present },
-          { text: "Absent", width: ATTENDANCE.absent },
-          { text: "Sessions", width: ATTENDANCE.sessions },
-          { text: "Attendance", width: ATTENDANCE.rate },
-          { text: "Status", width: ATTENDANCE.status },
-        ],
-        { bold: true, shade: HEADER_SHADE, wrap: true }
-      );
-
-      for (const m of data.attendance.modules) {
-        breakIfNeeded();
-        drawTableRow(doc, [
-          { text: m.module, width: ATTENDANCE.module },
-          { text: String(m.present), width: ATTENDANCE.present },
-          { text: String(m.absent), width: ATTENDANCE.absent },
-          { text: String(m.total), width: ATTENDANCE.sessions },
-          { text: `${m.percentage}%`, width: ATTENDANCE.rate },
-          { text: m.meetsThreshold ? "OK" : "LOW", width: ATTENDANCE.status, status: { positive: m.meetsThreshold } },
-        ]);
-
-        if (m.records) {
-          for (const r of m.records) {
-            breakIfNeeded();
-            drawTableRow(doc, [
-              { text: r.date, width: RECORD.date },
-              { text: r.status, width: RECORD.status },
-              { text: r.remarks || "-", width: RECORD.remarks },
-            ]);
+          if (m.records && m.records.length > 0) {
+            recordHeader();
+            for (const r of m.records) {
+              drawTableRow(
+                doc,
+                [
+                  { text: r.date, width: RECORD.date },
+                  { text: statusLabel(r.status), width: RECORD.status },
+                  { text: r.remarks || "-", width: RECORD.remarks },
+                ],
+                {
+                  newPage: () => {
+                    header();
+                    recordHeader();
+                  },
+                }
+              );
+            }
           }
         }
+
+        if (data.attendance.modules.length === 0) {
+          addParagraph(doc, "No attendance recorded for this selection.");
+        } else {
+          drawTableRow(
+            doc,
+            [
+              { text: "OVERALL", width: ATTENDANCE.module },
+              { text: String(data.attendance.overall.present), width: ATTENDANCE.present },
+              { text: String(data.attendance.overall.absent), width: ATTENDANCE.absent },
+              { text: String(data.attendance.overall.total), width: ATTENDANCE.sessions },
+              { text: `${data.attendance.overall.percentage}%`, width: ATTENDANCE.rate },
+              { text: "", width: ATTENDANCE.status },
+            ],
+            { bold: true, shade: HEADER_SHADE, newPage: header }
+          );
+        }
+        doc.moveDown(0.8);
       }
 
-      if (data.attendance.modules.length === 0) {
-        addParagraph(doc, "No attendance recorded for this selection.");
-      } else {
-        breakIfNeeded();
-        drawTableRow(
-          doc,
-          [
-            { text: "OVERALL", width: ATTENDANCE.module },
-            { text: String(data.attendance.overall.present), width: ATTENDANCE.present },
-            { text: String(data.attendance.overall.absent), width: ATTENDANCE.absent },
-            { text: String(data.attendance.overall.total), width: ATTENDANCE.sessions },
-            { text: `${data.attendance.overall.percentage}%`, width: ATTENDANCE.rate },
-            { text: "", width: ATTENDANCE.status },
-          ],
-          { bold: true, shade: HEADER_SHADE, wrap: true }
-        );
-      }
-      doc.moveDown(0.8);
-    }
+      if (data.assessments) {
+        addSectionTitle(doc, "Assessments", newPage);
+        const itemHeader = () =>
+          drawTableRow(
+            doc,
+            [
+              { text: "Assessment", width: ASSESSMENT.name },
+              { text: "Date", width: ASSESSMENT.date },
+              { text: "Marks", width: ASSESSMENT.marks },
+              { text: "Score", width: ASSESSMENT.score },
+              { text: "Remarks", width: ASSESSMENT.remarks },
+            ],
+            { bold: true, newPage: header }
+          );
 
-    if (data.assessments) {
-      addSectionTitle(doc, "Assessments");
-      for (const m of data.assessments.modules) {
-        breakIfNeeded();
-        drawTableRow(
-          doc,
-          [
-            { text: m.module, width: ASSESSMENT_MODULE.module },
-            { text: `${m.graded} / ${m.total} marked`, width: ASSESSMENT_MODULE.marked },
-            {
-              text: m.graded > 0 ? `average ${m.average}% · ${m.passes ? "PASS" : "FAIL"}` : "nothing marked yet",
-              width: ASSESSMENT_MODULE.result,
-            },
-          ],
-          { bold: true, shade: HEADER_SHADE, wrap: true }
-        );
-        for (const item of m.items) {
-          breakIfNeeded();
-          drawTableRow(doc, [
-            { text: item.name, width: ASSESSMENT.name },
-            { text: item.date, width: ASSESSMENT.date },
-            { text: item.marks === null ? "not marked" : `${item.marks} / ${item.maxMarks}`, width: ASSESSMENT.marks },
-            { text: item.remarks || "-", width: ASSESSMENT.remarks },
-          ]);
+        for (const m of data.assessments.modules) {
+          drawTableRow(
+            doc,
+            [
+              { text: m.module, width: ASSESSMENT_MODULE.module },
+              { text: `${m.graded} / ${m.total} marked`, width: ASSESSMENT_MODULE.marked },
+              {
+                text: m.graded > 0 ? `average ${m.average}% · ${m.passes ? "PASS" : "FAIL"}` : "nothing marked yet",
+                width: ASSESSMENT_MODULE.result,
+              },
+            ],
+            { bold: true, shade: HEADER_SHADE, newPage: header }
+          );
+          itemHeader();
+          for (const item of m.items) {
+            drawTableRow(
+              doc,
+              [
+                { text: item.name, width: ASSESSMENT.name },
+                { text: item.date, width: ASSESSMENT.date },
+                { text: item.marks === null ? "not marked" : `${item.marks} / ${item.maxMarks}`, width: ASSESSMENT.marks },
+                {
+                  text: item.marks === null ? "-" : `${roundPercentage(scorePercentage(item.marks, item.maxMarks))}%`,
+                  width: ASSESSMENT.score,
+                },
+                { text: item.remarks || "-", width: ASSESSMENT.remarks },
+              ],
+              {
+                newPage: () => {
+                  header();
+                  itemHeader();
+                },
+              }
+            );
+          }
+        }
+
+        if (data.assessments.modules.length === 0) {
+          addParagraph(doc, "No assessments recorded for this selection.");
+        } else {
+          drawTableRow(
+            doc,
+            [
+              { text: "OVERALL", width: ASSESSMENT_MODULE.module },
+              {
+                text: `${data.assessments.overall.graded} / ${data.assessments.overall.total} marked`,
+                width: ASSESSMENT_MODULE.marked,
+              },
+              {
+                text:
+                  data.assessments.overall.graded > 0
+                    ? `average ${data.assessments.overall.average}% · ${data.assessments.overall.passes ? "PASS" : "FAIL"}`
+                    : "nothing marked yet",
+                width: ASSESSMENT_MODULE.result,
+              },
+            ],
+            { bold: true, shade: HEADER_SHADE, newPage: header }
+          );
+        }
+        doc.moveDown(0.8);
+      }
+
+      if (options.includeSummary) {
+        addSectionTitle(doc, "Summary", newPage);
+        if (data.attendance) {
+          addParagraph(
+            doc,
+            `Attendance: ${data.attendance.overall.percentage}% against a ${data.thresholds.attendance}% requirement.`
+          );
+        }
+        if (data.assessments) {
+          addParagraph(
+            doc,
+            data.assessments.overall.graded > 0
+              ? `Assessments: an average of ${data.assessments.overall.average}% across ${data.assessments.overall.graded} marked assessment${data.assessments.overall.graded === 1 ? "" : "s"}, against a ${data.thresholds.passMark}% pass mark.`
+              : "Assessments: none marked for this selection."
+          );
         }
       }
-
-      if (data.assessments.modules.length === 0) {
-        addParagraph(doc, "No assessments recorded for this selection.");
-      } else {
-        breakIfNeeded();
-        drawTableRow(
-          doc,
-          [
-            { text: "OVERALL", width: ASSESSMENT_MODULE.module },
-            {
-              text: `${data.assessments.overall.graded} / ${data.assessments.overall.total} marked`,
-              width: ASSESSMENT_MODULE.marked,
-            },
-            {
-              text:
-                data.assessments.overall.graded > 0
-                  ? `average ${data.assessments.overall.average}% · ${data.assessments.overall.passes ? "PASS" : "FAIL"}`
-                  : "nothing marked yet",
-              width: ASSESSMENT_MODULE.result,
-            },
-          ],
-          { bold: true, shade: HEADER_SHADE, wrap: true }
-        );
-      }
-      doc.moveDown(0.8);
-    }
-
-    if (options.includeSummary) {
-      addSectionTitle(doc, "Summary");
-      if (data.attendance) {
-        addParagraph(
-          doc,
-          `Attendance: ${data.attendance.overall.percentage}% against a ${data.thresholds.attendance}% requirement.`
-        );
-      }
-      if (data.assessments) {
-        addParagraph(
-          doc,
-          data.assessments.overall.graded > 0
-            ? `Assessments: an average of ${data.assessments.overall.average}% across ${data.assessments.overall.graded} marked assessment${data.assessments.overall.graded === 1 ? "" : "s"}, against a ${data.thresholds.passMark}% pass mark.`
-            : "Assessments: none marked for this selection."
-        );
-      }
-    }
-
-    addGeneratedFooter(doc, data.generatedAt);
-  });
+    },
+    { footer: { generatedAt: data.generatedAt } }
+  );
 
   const safeName = data.student.registrationNumber.replace(/[^a-zA-Z0-9-]/g, "-");
   return { pdf, filename: `student-record-${safeName}-${dayjs().format("YYYYMMDD")}.pdf` };

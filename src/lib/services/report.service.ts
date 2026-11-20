@@ -5,10 +5,13 @@ import {
   bufferPdf,
   addReportHeader,
   addParagraph,
-  addGeneratedFooter,
   drawTableRow,
-  needsPageBreak,
+  fillWidth,
+  fitColumn,
+  wordFitWidth,
+  usableWidth,
   HEADER_SHADE,
+  type TableCell,
 } from "@/lib/pdf";
 import { toUtcDayStart, toUtcDayEnd } from "@/lib/date";
 import { computeStanding, passes, roundPercentage, scorePercentage } from "@/lib/grading";
@@ -17,18 +20,53 @@ import type { Session } from "@/lib/auth";
 import { classCourseLabel, classRoster, resolveClass, type ResolvedClass } from "@/lib/services/teaching.service";
 import { moduleAtLevelLabel } from "@/lib/levels";
 
-// Landscape column widths at the 10pt report size. A date column fits "DD/MM"
-// with the cell padding either side; the rest is sized for its longest value.
-const REG_COL_WIDTH = 90;
-const NAME_COL_WIDTH = 130;
-const PRESENT_COL_WIDTH = 45;
-const PCT_COL_WIDTH = 50;
-const DATE_COL_WIDTH = 36;
-const ASSESSMENT_COL_WIDTH = 68;
-const MARKED_COL_WIDTH = 55;
-const AVERAGE_COL_WIDTH = 60;
-const SIGNATURE_COL_WIDTH = 90;
+// Landscape column widths at the 10pt report size, each sized for its longest
+// value with the cell padding either side. The name column takes whatever the
+// page has left, and never less than NAME_MIN_WIDTH. A date column fits a bold
+// "DD/MM". Reg. No is sized to the longest number on the sheet, and each
+// assessment column to the longest word in its heading, within these bounds.
+const REG_COL = { min: 70, max: 130 };
+const ASSESSMENT_COL = { min: 48, max: 110 };
+const NAME_MIN_WIDTH = 125;
+const PRESENT_COL_WIDTH = 40;
+const PCT_COL_WIDTH = 45;
+const DATE_COL_WIDTH = 38;
+const MARKED_COL_WIDTH = 50;
+const AVERAGE_COL_WIDTH = 55;
+const SIGNATURE_COL_WIDTH = 75;
 const STATUS_COL_WIDTH = 50;
+
+const generatedAt = () => dayjs().format("DD MMM YYYY, HH:mm");
+
+/**
+ * Splits columns into the blocks that fit across a page, filling each block
+ * while the next column still fits in `available`, and names each block by
+ * what it holds ("Sessions 9–16 of 22"). The page number lives in the footer;
+ * a block label that said "Page 1 of 3" on page two misled people.
+ */
+function packBlocks<T>(items: T[], widthOf: (item: T) => number, available: number, noun: string) {
+  const groups: T[][] = [];
+  let current: T[] = [];
+  let used = 0;
+  for (const item of items) {
+    const width = widthOf(item);
+    if (current.length > 0 && used + width > available) {
+      groups.push(current);
+      current = [];
+      used = 0;
+    }
+    current.push(item);
+    used += width;
+  }
+  if (current.length > 0) groups.push(current);
+
+  let start = 0;
+  return groups.map((group) => {
+    const label = groups.length > 1 ? `${noun} ${start + 1}–${start + group.length} of ${items.length}` : "";
+    start += group.length;
+    return { items: group, label };
+  });
+}
 
 /** "Electrical Installation Level I (EI101) · Electrical, Plumbing" */
 function classSubtitle(cls: ResolvedClass) {
@@ -90,8 +128,11 @@ export async function generateAttendanceReport(
 
   const pdf = await bufferPdf(
     (doc) => {
+      let pages = 0;
       const header = (label: string) =>
-        addReportHeader(doc, settings.institutionName, "Attendance Register", label, settings.institutionLogo);
+        addReportHeader(doc, settings.institutionName, "Attendance Register", label, settings.institutionLogo, {
+          continued: pages++ > 0,
+        });
 
       if (students.length === 0 || dates.length === 0) {
         header(subtitle);
@@ -104,68 +145,66 @@ export async function generateAttendanceReport(
         return;
       }
 
-      const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const regWidth = fitColumn(doc, ["Reg. No", ...students.map((st) => st.registrationNumber)], { ...REG_COL, bold: true });
       const fixedWidth =
-        REG_COL_WIDTH + NAME_COL_WIDTH + PRESENT_COL_WIDTH + PCT_COL_WIDTH + STATUS_COL_WIDTH + SIGNATURE_COL_WIDTH;
-      const datesPerChunk = Math.max(1, Math.floor((usableWidth - fixedWidth) / DATE_COL_WIDTH));
+        regWidth + PRESENT_COL_WIDTH + PCT_COL_WIDTH + STATUS_COL_WIDTH + SIGNATURE_COL_WIDTH;
+      const blocks = packBlocks(dates, () => DATE_COL_WIDTH, usableWidth(doc) - fixedWidth - NAME_MIN_WIDTH, "Sessions");
 
-      const chunks: string[][] = [];
-      for (let i = 0; i < dates.length; i += datesPerChunk) {
-        chunks.push(dates.slice(i, i + datesPerChunk));
-      }
-
-      const drawHeaderRow = (chunk: string[]) => {
-        drawTableRow(
-          doc,
-          [
-            { text: "Reg. No", width: REG_COL_WIDTH },
-            { text: "Name", width: NAME_COL_WIDTH },
-            ...chunk.map((d) => ({ text: dayjs(d).format("DD/MM"), width: DATE_COL_WIDTH })),
-            { text: "Pres.", width: PRESENT_COL_WIDTH },
-            { text: "Att %", width: PCT_COL_WIDTH },
-            { text: "Status", width: STATUS_COL_WIDTH },
-            { text: "Signature", width: SIGNATURE_COL_WIDTH },
-          ],
-          { bold: true, shade: HEADER_SHADE, wrap: true }
+      blocks.forEach((block, blockIndex) => {
+        const [reg, name, ...rest] = fillWidth(
+          [regWidth, NAME_MIN_WIDTH, ...block.items.map(() => DATE_COL_WIDTH), PRESENT_COL_WIDTH, PCT_COL_WIDTH, STATUS_COL_WIDTH, SIGNATURE_COL_WIDTH],
+          usableWidth(doc),
+          1
         );
-      };
+        const [present, pct, status, signature] = rest.slice(block.items.length);
+        const label = block.label ? `${subtitle} · ${block.label}` : subtitle;
 
-      const pageLabel = (chunkIndex: number) =>
-        chunks.length > 1 ? `${subtitle} · Page ${chunkIndex + 1} of ${chunks.length}` : subtitle;
+        const drawHeaderRow = () =>
+          drawTableRow(
+            doc,
+            [
+              { text: "Reg. No", width: reg },
+              { text: "Name", width: name },
+              ...block.items.map((d) => ({ text: dayjs(d).format("DD/MM"), width: DATE_COL_WIDTH })),
+              { text: "Pres.", width: present },
+              { text: "Att %", width: pct },
+              { text: "Status", width: status },
+              { text: "Signature", width: signature },
+            ],
+            { bold: true, shade: HEADER_SHADE }
+          );
+        const newPage = () => {
+          header(label);
+          drawHeaderRow();
+        };
 
-      chunks.forEach((chunk, chunkIndex) => {
-        if (chunkIndex > 0) doc.addPage();
-        header(pageLabel(chunkIndex));
-        drawHeaderRow(chunk);
+        if (blockIndex > 0) doc.addPage();
+        newPage();
 
         for (const student of students) {
-          if (needsPageBreak(doc)) {
-            doc.addPage();
-            header(pageLabel(chunkIndex));
-            drawHeaderRow(chunk);
-          }
-
           const presentDates = presentDatesByStudent.get(student.id) ?? new Set<string>();
           const totalPresent = presentDates.size;
           const pctValue = (totalPresent / dates.length) * 100;
           const meetsThreshold = pctValue >= settings.attendanceThreshold;
 
-          drawTableRow(doc, [
-            { text: student.registrationNumber, width: REG_COL_WIDTH },
-            { text: student.fullName, width: NAME_COL_WIDTH },
-            ...chunk.map((d) => ({ text: "", width: DATE_COL_WIDTH, tick: presentDates.has(d) })),
-            { text: String(totalPresent), width: PRESENT_COL_WIDTH },
-            { text: `${pctValue.toFixed(0)}%`, width: PCT_COL_WIDTH },
-            { text: meetsThreshold ? "OK" : "LOW", width: STATUS_COL_WIDTH, status: { positive: meetsThreshold } },
-            // Left blank for physical sign-off.
-            { text: "", width: SIGNATURE_COL_WIDTH },
-          ]);
+          drawTableRow(
+            doc,
+            [
+              { text: student.registrationNumber, width: reg },
+              { text: student.fullName, width: name },
+              ...block.items.map((d) => ({ text: "", width: DATE_COL_WIDTH, tick: presentDates.has(d) })),
+              { text: String(totalPresent), width: present },
+              { text: `${pctValue.toFixed(0)}%`, width: pct },
+              { text: meetsThreshold ? "OK" : "LOW", width: status, status: { positive: meetsThreshold } },
+              // Left blank for physical sign-off.
+              { text: "", width: signature },
+            ],
+            { newPage }
+          );
         }
       });
-
-      addGeneratedFooter(doc, dayjs().format("DD MMM YYYY, HH:mm"));
     },
-    { layout: "landscape" }
+    { layout: "landscape", footer: { generatedAt: generatedAt() } }
   );
 
   return { pdf, filename: `attendance-${cls.label.replace(/\s+/g, "-")}-${dayjs().format("YYYYMMDD")}.pdf` };
@@ -199,72 +238,83 @@ export async function generateAssessmentReport(session: Session, assessmentId: s
 
   // The sheet carries a percentage and a verdict as well as the raw mark: the
   // mark on its own says nothing now that every assessment sets its own total,
-  // and the pass mark it is judged against is a percentage. The widths add up
-  // to the usable portrait width.
-  const colWidths = { reg: 95, name: 120, marks: 65, pct: 50, status: 50, remarks: 60, signature: 75 };
-
-  const drawHeaderRow = (doc: PDFKit.PDFDocument) => {
-    drawTableRow(
-      doc,
-      [
-        { text: "Reg. No", width: colWidths.reg },
-        { text: "Name", width: colWidths.name },
-        { text: `Marks /${assessment.maxMarks}`, width: colWidths.marks },
-        { text: "Score", width: colWidths.pct },
-        { text: "Status", width: colWidths.status },
-        { text: "Remarks", width: colWidths.remarks },
-        { text: "Signature", width: colWidths.signature },
-      ],
-      { bold: true, shade: HEADER_SHADE, wrap: true }
-    );
-  };
-
-  const pdf = await bufferPdf((doc) => {
-    const header = () =>
-      addReportHeader(doc, settings.institutionName, "Assessment Report", subtitle, settings.institutionLogo);
-    header();
-
-    addParagraph(
-      doc,
-      `Marked out of: ${assessment.maxMarks}    Total Students: ${total}    Average: ${average.toFixed(1)} (${averagePct}%)    Highest: ${highest}    Lowest: ${lowest}`,
-      { bold: true }
-    );
-    addParagraph(
-      doc,
-      `Score is the mark as a percentage of ${assessment.maxMarks}. PASS is ${settings.assessmentPassMark}% or above.`,
-      { color: "#555555" }
-    );
-    doc.moveDown(0.8);
-
-    drawHeaderRow(doc);
-
-    for (const mark of marks) {
-      if (needsPageBreak(doc)) {
-        doc.addPage();
+  // and the pass mark it is judged against is a percentage. The name column
+  // takes what the portrait width leaves.
+  const pdf = await bufferPdf(
+    (doc) => {
+      const [reg, name, marksCol, pct, status, remarks, signature] = fillWidth(
+        [fitColumn(doc, ["Reg. No", ...marks.map((m) => m.student.registrationNumber)], { ...REG_COL, bold: true }), 0, 45, 45, 45, 90, 60],
+        usableWidth(doc),
+        1
+      );
+      let pages = 0;
+      const header = () =>
+        addReportHeader(doc, settings.institutionName, "Assessment Report", subtitle, settings.institutionLogo, {
+          continued: pages++ > 0,
+        });
+      const drawHeaderRow = () =>
+        drawTableRow(
+          doc,
+          [
+            { text: "Reg. No", width: reg },
+            { text: "Name", width: name },
+            // On two lines for the same reason as the summary's headings.
+            { text: `Marks\n/${assessment.maxMarks}`, width: marksCol },
+            { text: "Score", width: pct },
+            { text: "Status", width: status },
+            { text: "Remarks", width: remarks },
+            { text: "Signature", width: signature },
+          ],
+          { bold: true, shade: HEADER_SHADE }
+        );
+      const newPage = () => {
         header();
-        drawHeaderRow(doc);
+        drawHeaderRow();
+      };
+
+      header();
+      addParagraph(
+        doc,
+        total > 0
+          ? `Marked out of: ${assessment.maxMarks}    Students marked: ${total}    Average: ${average.toFixed(1)} (${averagePct}%)    Highest: ${highest}    Lowest: ${lowest}`
+          : `Marked out of: ${assessment.maxMarks}    Students marked: 0`,
+        { bold: true }
+      );
+      addParagraph(
+        doc,
+        `Score is the mark as a percentage of ${assessment.maxMarks}. PASS is ${settings.assessmentPassMark}% or above.`,
+        { color: "#555555" }
+      );
+      doc.moveDown(0.8);
+
+      if (marks.length === 0) {
+        addParagraph(doc, "No marks recorded for this assessment yet.");
+        return;
       }
-      // Judged on the rounded figure, so the verdict never contradicts the
-      // percentage printed beside it on a sheet somebody is asked to sign.
-      const percentage = roundPercentage(scorePercentage(mark.marks, assessment.maxMarks));
-      const passed = percentage >= settings.assessmentPassMark;
-      drawTableRow(doc, [
-        { text: mark.student.registrationNumber, width: colWidths.reg },
-        { text: mark.student.fullName, width: colWidths.name },
-        { text: String(mark.marks), width: colWidths.marks },
-        { text: `${percentage}%`, width: colWidths.pct },
-        { text: passed ? "PASS" : "FAIL", width: colWidths.status, status: { positive: passed } },
-        { text: mark.remarks || "-", width: colWidths.remarks },
-        { text: "", width: colWidths.signature },
-      ]);
-    }
 
-    if (marks.length === 0) {
-      addParagraph(doc, "No marks recorded for this assessment yet.");
-    }
-
-    addGeneratedFooter(doc, dayjs().format("DD MMM YYYY, HH:mm"));
-  });
+      drawHeaderRow();
+      for (const mark of marks) {
+        // Judged on the rounded figure, so the verdict never contradicts the
+        // percentage printed beside it on a sheet somebody is asked to sign.
+        const percentage = roundPercentage(scorePercentage(mark.marks, assessment.maxMarks));
+        const passed = percentage >= settings.assessmentPassMark;
+        drawTableRow(
+          doc,
+          [
+            { text: mark.student.registrationNumber, width: reg },
+            { text: mark.student.fullName, width: name },
+            { text: String(mark.marks), width: marksCol },
+            { text: `${percentage}%`, width: pct },
+            { text: passed ? "PASS" : "FAIL", width: status, status: { positive: passed } },
+            { text: mark.remarks || "-", width: remarks },
+            { text: "", width: signature },
+          ],
+          { newPage }
+        );
+      }
+    },
+    { footer: { generatedAt: generatedAt() } }
+  );
 
   return {
     pdf,
@@ -308,8 +358,11 @@ export async function generateAllAssessmentsReport(
 
   const pdf = await bufferPdf(
     (doc) => {
+      let pages = 0;
       const header = (label: string) =>
-        addReportHeader(doc, settings.institutionName, "Assessment Summary", label, settings.institutionLogo);
+        addReportHeader(doc, settings.institutionName, "Assessment Summary", label, settings.institutionLogo, {
+          continued: pages++ > 0,
+        });
 
       if (students.length === 0 || assessments.length === 0) {
         header(subtitle);
@@ -322,77 +375,84 @@ export async function generateAllAssessmentsReport(
         return;
       }
 
-      const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const regWidth = fitColumn(doc, ["Reg. No", ...students.map((st) => st.registrationNumber)], { ...REG_COL, bold: true });
       const fixedWidth =
-        REG_COL_WIDTH + NAME_COL_WIDTH + MARKED_COL_WIDTH + AVERAGE_COL_WIDTH + STATUS_COL_WIDTH + SIGNATURE_COL_WIDTH;
-      const assessmentsPerChunk = Math.max(1, Math.floor((usableWidth - fixedWidth) / ASSESSMENT_COL_WIDTH));
+        regWidth + MARKED_COL_WIDTH + AVERAGE_COL_WIDTH + STATUS_COL_WIDTH + SIGNATURE_COL_WIDTH;
+      // The total goes on its own line: line-breaking rules forbid a break
+      // before "/" even after a space, so "Examination /100" on one line is a
+      // single unbreakable word that pdfkit would cut mid-letter instead.
+      const headingOf = (a: (typeof assessments)[number]) => `${a.name}\n/${a.maxMarks}`;
+      const widthOf = new Map(
+        assessments.map((a) => [a.id, wordFitWidth(doc, headingOf(a), { ...ASSESSMENT_COL, bold: true })])
+      );
+      const blocks = packBlocks(
+        assessments,
+        (a) => widthOf.get(a.id)!,
+        usableWidth(doc) - fixedWidth - NAME_MIN_WIDTH,
+        "Assessments"
+      );
 
-      const chunks: (typeof assessments)[] = [];
-      for (let i = 0; i < assessments.length; i += assessmentsPerChunk) {
-        chunks.push(assessments.slice(i, i + assessmentsPerChunk));
-      }
-
-      const drawHeaderRow = (chunk: typeof assessments) => {
-        drawTableRow(
-          doc,
-          [
-            { text: "Reg. No", width: REG_COL_WIDTH },
-            { text: "Name", width: NAME_COL_WIDTH },
-            ...chunk.map((a) => ({ text: `${a.name} /${a.maxMarks}`, width: ASSESSMENT_COL_WIDTH })),
-            { text: "Marked", width: MARKED_COL_WIDTH },
-            { text: "Average", width: AVERAGE_COL_WIDTH },
-            { text: "Status", width: STATUS_COL_WIDTH },
-            { text: "Signature", width: SIGNATURE_COL_WIDTH },
-          ],
-          { bold: true, shade: HEADER_SHADE, wrap: true }
+      blocks.forEach((block, blockIndex) => {
+        const [reg, name, ...rest] = fillWidth(
+          [regWidth, NAME_MIN_WIDTH, ...block.items.map((a) => widthOf.get(a.id)!), MARKED_COL_WIDTH, AVERAGE_COL_WIDTH, STATUS_COL_WIDTH, SIGNATURE_COL_WIDTH],
+          usableWidth(doc),
+          1
         );
-      };
+        const [markedCol, averageCol, status, signature] = rest.slice(block.items.length);
+        const label = block.label ? `${subtitle} · ${block.label}` : subtitle;
 
-      const pageLabel = (chunkIndex: number) =>
-        chunks.length > 1 ? `${subtitle} · Page ${chunkIndex + 1} of ${chunks.length}` : subtitle;
+        const drawHeaderRow = () =>
+          drawTableRow(
+            doc,
+            [
+              { text: "Reg. No", width: reg },
+              { text: "Name", width: name },
+              ...block.items.map((a) => ({ text: headingOf(a), width: widthOf.get(a.id)! })),
+              { text: "Marked", width: markedCol },
+              { text: "Average", width: averageCol },
+              { text: "Status", width: status },
+              { text: "Signature", width: signature },
+            ],
+            { bold: true, shade: HEADER_SHADE }
+          );
+        const newPage = () => {
+          header(label);
+          drawHeaderRow();
+        };
 
-      chunks.forEach((chunk, chunkIndex) => {
-        if (chunkIndex > 0) doc.addPage();
-        header(pageLabel(chunkIndex));
-        drawHeaderRow(chunk);
+        if (blockIndex > 0) doc.addPage();
+        newPage();
 
         for (const student of students) {
-          if (needsPageBreak(doc)) {
-            doc.addPage();
-            header(pageLabel(chunkIndex));
-            drawHeaderRow(chunk);
-          }
-
           const studentMarks = marksByStudent.get(student.id) ?? new Map<string, number>();
           const standing = computeStanding(
             assessments.map((a) => ({ marks: studentMarks.get(a.id) ?? null, maxMarks: a.maxMarks }))
           );
           const passed = passes(standing, settings.assessmentPassMark);
 
-          drawTableRow(doc, [
-            { text: student.registrationNumber, width: REG_COL_WIDTH },
-            { text: student.fullName, width: NAME_COL_WIDTH },
-            ...chunk.map((a) => ({
+          const cells: TableCell[] = [
+            { text: student.registrationNumber, width: reg },
+            { text: student.fullName, width: name },
+            ...block.items.map((a) => ({
               text: studentMarks.has(a.id) ? String(studentMarks.get(a.id)) : "-",
-              width: ASSESSMENT_COL_WIDTH,
+              width: widthOf.get(a.id)!,
             })),
-            { text: `${standing.graded}/${standing.total}`, width: MARKED_COL_WIDTH },
-            { text: standing.graded > 0 ? `${standing.average.toFixed(0)}%` : "-", width: AVERAGE_COL_WIDTH },
+            { text: `${standing.graded}/${standing.total}`, width: markedCol },
+            { text: standing.graded > 0 ? `${standing.average.toFixed(0)}%` : "-", width: averageCol },
             // Nothing marked means no verdict to give: leave the cell empty rather
             // than printing a FAIL against work the student never sat.
             {
               text: standing.graded > 0 ? (passed ? "PASS" : "FAIL") : "",
-              width: STATUS_COL_WIDTH,
+              width: status,
               status: { positive: passed },
             },
-            { text: "", width: SIGNATURE_COL_WIDTH },
-          ]);
+            { text: "", width: signature },
+          ];
+          drawTableRow(doc, cells, { newPage });
         }
       });
-
-      addGeneratedFooter(doc, dayjs().format("DD MMM YYYY, HH:mm"));
     },
-    { layout: "landscape" }
+    { layout: "landscape", footer: { generatedAt: generatedAt() } }
   );
 
   return { pdf, filename: `assessments-${cls.label.replace(/\s+/g, "-")}-${dayjs().format("YYYYMMDD")}.pdf` };

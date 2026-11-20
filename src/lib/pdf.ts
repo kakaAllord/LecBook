@@ -38,7 +38,16 @@ function registerReportFonts(doc: PDFKit.PDFDocument) {
 
 export function bufferPdf(
   build: (doc: PDFKit.PDFDocument) => void,
-  options: { layout?: "portrait" | "landscape"; margin?: number } = {}
+  options: {
+    layout?: "portrait" | "landscape";
+    margin?: number;
+    /**
+     * Stamps "Generated on … · Page n of N" at the foot of every page. Reports
+     * pass it; a sheet handed round loose needs its place in the set and its
+     * date on each page, not only on the last.
+     */
+    footer?: { generatedAt: string };
+  } = {}
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
@@ -57,11 +66,30 @@ export function bufferPdf(
     try {
       registerReportFonts(doc);
       build(doc);
+      if (options.footer) stampPageFooters(doc, options.footer.generatedAt);
       doc.end();
     } catch (error) {
       reject(error);
     }
   });
+}
+
+function stampPageFooters(doc: PDFKit.PDFDocument, generatedAt: string) {
+  const range = doc.bufferedPageRange();
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i);
+    const { left, right, bottom } = doc.page.margins;
+    const width = doc.page.width - left - right;
+    const y = doc.page.height - bottom + 12;
+    // Writing inside the bottom margin would make pdfkit start a new page;
+    // lifting the margin for the duration keeps the footer on this one.
+    doc.page.margins.bottom = 0;
+    setFont(doc).fillColor("#888888");
+    doc.text(`Generated on ${generatedAt}`, left, y, { width, align: "left", lineBreak: false });
+    doc.text(`Page ${i - range.start + 1} of ${range.count}`, left, y, { width, align: "right", lineBreak: false });
+    doc.fillColor("#000000");
+    doc.page.margins.bottom = bottom;
+  }
 }
 
 /** Sets the report typeface at a size inside the 10–12pt band. */
@@ -87,27 +115,39 @@ function drawLogo(doc: PDFKit.PDFDocument, logoDataUrl: string, y: number) {
 /**
  * The logo sits centred at the very top, with the institution's name directly
  * beneath it, then the report title and its subtitle.
+ *
+ * Continuation pages (`continued`) carry a one-line version instead: the
+ * institution and title side by side, then the subtitle. The full header takes
+ * a quarter of a landscape page, and repeating it on every page of a long
+ * register cost a page in every four without telling the reader anything new.
  */
 export function addReportHeader(
   doc: PDFKit.PDFDocument,
   institutionName: string,
   title: string,
   subtitle?: string,
-  logoDataUrl?: string | null
+  logoDataUrl?: string | null,
+  opts: { continued?: boolean } = {}
 ) {
   const left = doc.page.margins.left;
   const width = doc.page.width - left - doc.page.margins.right;
 
-  if (logoDataUrl && drawLogo(doc, logoDataUrl, doc.y)) {
-    doc.y += LOGO_SIZE + 6;
+  if (opts.continued) {
+    setFont(doc, { bold: true, size: REPORT_SIZE.heading }).text(`${institutionName} · ${title}`, left, doc.y, {
+      width,
+      align: "center",
+    });
+  } else {
+    if (logoDataUrl && drawLogo(doc, logoDataUrl, doc.y)) {
+      doc.y += LOGO_SIZE + 6;
+    }
+    setFont(doc, { bold: true, size: REPORT_SIZE.title }).text(institutionName, left, doc.y, {
+      width,
+      align: "center",
+    });
+    doc.moveDown(0.15);
+    setFont(doc, { bold: true, size: REPORT_SIZE.heading }).text(title, left, doc.y, { width, align: "center" });
   }
-
-  setFont(doc, { bold: true, size: REPORT_SIZE.title }).text(institutionName, left, doc.y, {
-    width,
-    align: "center",
-  });
-  doc.moveDown(0.15);
-  setFont(doc, { bold: true, size: REPORT_SIZE.heading }).text(title, left, doc.y, { width, align: "center" });
   if (subtitle) {
     doc.moveDown(0.15);
     setFont(doc).fillColor("#555555").text(subtitle, left, doc.y, { width, align: "center" });
@@ -120,12 +160,23 @@ export function addReportHeader(
     .moveTo(left, doc.y)
     .lineTo(left + width, doc.y)
     .stroke();
-  doc.moveDown(0.8);
+  doc.moveDown(opts.continued ? 0.6 : 0.8);
   doc.x = left;
 }
 
-/** A section heading inside a report, left to the margin like a document's. */
-export function addSectionTitle(doc: PDFKit.PDFDocument, title: string) {
+/** The width between the side margins. */
+export function usableWidth(doc: PDFKit.PDFDocument) {
+  return doc.page.width - doc.page.margins.left - doc.page.margins.right;
+}
+
+/**
+ * A section heading inside a report, left to the margin like a document's.
+ * When there is no room for the heading and a couple of rows under it, it
+ * starts a new page (through `newPage`) rather than sitting alone at the foot
+ * of this one.
+ */
+export function addSectionTitle(doc: PDFKit.PDFDocument, title: string, newPage?: () => void) {
+  if (newPage && needsPageBreak(doc, REPORT_SIZE.heading * 2 + ROW_HEIGHT * 3)) newPage();
   doc.moveDown(0.4);
   setFont(doc, { bold: true, size: REPORT_SIZE.heading }).fillColor("#111827").text(title, doc.page.margins.left);
   doc.moveDown(0.3);
@@ -146,23 +197,11 @@ export function addParagraph(
   doc.fillColor("#000000");
 }
 
-export function addGeneratedFooter(doc: PDFKit.PDFDocument, when: string) {
-  doc.moveDown(1);
-  addParagraph(doc, `Generated on ${when}`, { color: "#888888", align: "right" });
-}
-
-/** Shortens text with an ellipsis until it fits the width at the current font. */
-function fitText(doc: PDFKit.PDFDocument, text: string, width: number) {
-  if (doc.widthOfString(text) <= width) return text;
-  let cut = text;
-  while (cut.length > 1 && doc.widthOfString(`${cut}…`) > width) cut = cut.slice(0, -1);
-  return `${cut.trimEnd()}…`;
-}
-
 /**
- * Writes one line of text centred horizontally and vertically inside a cell,
- * padded on every side and clipped with an ellipsis rather than spilling into
- * the next cell.
+ * Writes text centred horizontally and vertically inside a cell, padded on
+ * every side. Long text wraps onto further lines (the row has already been
+ * sized to hold it) rather than being cut short: a register or mark sheet that
+ * people sign has to show each name and number in full.
  */
 export function drawCellText(
   doc: PDFKit.PDFDocument,
@@ -171,34 +210,27 @@ export function drawCellText(
   y: number,
   width: number,
   height: number,
-  opts: { bold?: boolean; color?: string; wrap?: boolean } = {}
+  opts: { bold?: boolean; color?: string } = {}
 ) {
   setFont(doc, { bold: opts.bold });
   const inner = Math.max(1, width - CELL_PADDING * 2);
   doc.fillColor(opts.color ?? "#000000");
-  if (opts.wrap) {
-    const textHeight = doc.heightOfString(text, { width: inner, align: "center" });
-    doc.text(text, x + CELL_PADDING, y + (height - textHeight) / 2, { width: inner, align: "center" });
-  } else {
-    const line = fitText(doc, text, inner);
-    doc.text(line, x + CELL_PADDING, y + (height - doc.currentLineHeight()) / 2, {
-      width: inner,
-      align: "center",
-      lineBreak: false,
-    });
-  }
+  const textHeight = doc.heightOfString(text, { width: inner, align: "center" });
+  doc.text(text, x + CELL_PADDING, y + (height - textHeight) / 2, { width: inner, align: "center" });
   doc.fillColor("#000000");
 }
 
 /**
- * The height a wrapping row needs for its tallest cell, padding included, never
- * shorter than a single-line row.
+ * The height a row needs for its tallest cell, padding included, never
+ * shorter than a single-line row. Verdict pills and ticks are one line.
  */
-function wrappedRowHeight(doc: PDFKit.PDFDocument, cells: TableCell[], bold?: boolean) {
-  setFont(doc, { bold });
-  const tallest = Math.max(
-    ...cells.map((c) => (c.text ? doc.heightOfString(c.text, { width: Math.max(1, c.width - CELL_PADDING * 2) }) : 0))
-  );
+export function measureRow(doc: PDFKit.PDFDocument, cells: TableCell[], opts: { bold?: boolean } = {}) {
+  let tallest = 0;
+  for (const c of cells) {
+    if (!c.text || c.tick !== undefined) continue;
+    setFont(doc, { bold: opts.bold || Boolean(c.status) });
+    tallest = Math.max(tallest, doc.heightOfString(c.text, { width: Math.max(1, c.width - CELL_PADDING * 2), align: "center" }));
+  }
   return Math.max(ROW_HEIGHT, Math.ceil(tallest + CELL_PADDING * 2));
 }
 
@@ -233,8 +265,11 @@ export function drawStatusCell(
   const bg = positive ? "#dcfce7" : "#fee2e2";
   const fg = positive ? "#166534" : "#991b1b";
   const inset = 3;
+  // A single-line pill centred in the cell, so a row that grew for a wrapped
+  // name does not stretch the verdict into a tall block.
+  const pillHeight = Math.min(height, ROW_HEIGHT) - inset * 2;
   doc.save();
-  doc.rect(x + inset, y + inset, width - inset * 2, height - inset * 2).fill(bg);
+  doc.rect(x + inset, y + (height - pillHeight) / 2, width - inset * 2, pillHeight).fill(bg);
   doc.restore();
   drawCellText(doc, label, x, y, width, height, { bold: true, color: fg });
 }
@@ -261,18 +296,27 @@ export type TableCell = {
 
 /**
  * Draws one bordered row at the current position, every cell centred both
- * ways, then moves the cursor to the start of the next row. A wrapping row
- * (used for headers) lets long labels run onto further lines and grows to fit
- * them instead of cutting them short.
+ * ways, then moves the cursor to the start of the next row. Every row grows to
+ * fit its longest cell.
+ *
+ * When `newPage` is given and the row would run into the bottom margin, a page
+ * is added and `newPage` is called first to draw that page's header (and the
+ * table's own header row) — measured on the real row height, so a row that
+ * wraps onto two lines never spills past the margin.
  */
 export function drawTableRow(
   doc: PDFKit.PDFDocument,
   cells: TableCell[],
-  opts: { bold?: boolean; height?: number; shade?: string; wrap?: boolean } = {}
+  opts: { bold?: boolean; height?: number; shade?: string; newPage?: () => void } = {}
 ) {
+  const height = opts.height ?? measureRow(doc, cells, { bold: opts.bold });
+  if (opts.newPage && needsPageBreak(doc, height)) {
+    doc.addPage();
+    opts.newPage();
+  }
+
   const startX = doc.page.margins.left;
   const y = doc.y;
-  const height = opts.height ?? (opts.wrap ? wrappedRowHeight(doc, cells, opts.bold) : ROW_HEIGHT);
 
   if (opts.shade) {
     const total = cells.reduce((sum, c) => sum + c.width, 0);
@@ -296,7 +340,7 @@ export function drawTableRow(
     } else if (cell.tick !== undefined) {
       if (cell.tick) drawCellTick(doc, x, y, cell.width, height);
     } else if (cell.text) {
-      drawCellText(doc, cell.text, x, y, cell.width, height, { bold: opts.bold, wrap: opts.wrap });
+      drawCellText(doc, cell.text, x, y, cell.width, height, { bold: opts.bold });
     }
     x += cell.width;
   }
@@ -304,6 +348,50 @@ export function drawTableRow(
   // heuristic under-shoots for these fixed-position multi-column rows and causes overlap.
   doc.x = startX;
   doc.y = y + height;
+}
+
+/**
+ * The width a column needs to hold its longest value on one line, padding
+ * included, kept between `min` and `max`. Used for values whose length varies
+ * by institution — registration numbers above all — so a short format does
+ * not waste space and a long one does not wrap every row onto two lines.
+ */
+export function fitColumn(
+  doc: PDFKit.PDFDocument,
+  values: string[],
+  opts: { min: number; max: number; bold?: boolean }
+) {
+  setFont(doc, { bold: opts.bold });
+  const widest = Math.max(0, ...values.map((v) => doc.widthOfString(v)));
+  return Math.min(opts.max, Math.max(opts.min, Math.ceil(widest + CELL_PADDING * 2 + 2)));
+}
+
+/**
+ * The narrowest a column can be and still wrap `text` between words: its
+ * longest word on one line, padding included, kept between `min` and `max`.
+ * pdfkit splits a word that is wider than its column mid-way ("Continuou s"),
+ * so a column holding a wrapping heading must never be narrower than this.
+ */
+export function wordFitWidth(
+  doc: PDFKit.PDFDocument,
+  text: string,
+  opts: { min: number; max: number; bold?: boolean }
+) {
+  // pdfkit measures each word with the space after it, so a column that only
+  // just fits the bare word still splits it; measure it the same way.
+  return fitColumn(doc, text.split(/\s+/).map((word) => `${word} `), opts);
+}
+
+/**
+ * Widens `widths[flex]` so the columns fill `total` exactly. Reports size
+ * their fixed columns for their content and let one column (usually the name)
+ * take what is left, so every table meets the right margin.
+ */
+export function fillWidth(widths: number[], total: number, flex: number) {
+  const sum = widths.reduce((a, b) => a + b, 0);
+  const out = [...widths];
+  out[flex] += Math.max(0, total - sum);
+  return out;
 }
 
 /** Light grey behind header rows, so the column names read as headings. */
